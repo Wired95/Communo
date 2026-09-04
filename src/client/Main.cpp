@@ -100,6 +100,11 @@ int main(int argc, char const* argv[])
     if (!client.initTLS())
         return -1;
 
+    /* *********************************************************** */
+    /* *********************** CLI options *********************** */
+    /* *********************************************************** */
+
+    // echo ...
     cli.addCommand("echo", [&client](const std::vector<std::string>& args) {
         std::string replyStr;
 
@@ -109,6 +114,7 @@ int main(int argc, char const* argv[])
         client.sendEchoRequest(replyStr);
     });
 
+    // add <a> <b> ...
     cli.addCommand("add", [&client](const std::vector<std::string>& args)  {
         if (args.size() < 2)
             throw std::runtime_error("usage: add <a> <b> ...");
@@ -134,10 +140,33 @@ int main(int argc, char const* argv[])
 
     });
 
+    // broadcast ...
+    cli.addCommand("broadcast", [&client](const std::vector<std::string>& args) {
+        std::string replyStr;
+
+        for (const std::string& arg : args)
+            replyStr += arg + ' ';
+
+        client.sendBroadcast(replyStr);
+    });
+
+    /* todo:
+    CMSG_GET_CLIENT_LIST    = 0x0004, // todo
+    CMSG_SEND_MSG_TO_CLIENT = 0x0005, // todo
+    CMSG_UPTIME             = 0x0006, // todo
+    CMSG_PING               = 0x0007, // todo
+    CMSG_INCREMENT_COUNTER  = 0x0008, // todo
+    CMSG_GET_COUNTER        = 0x0009, // todo
+    
+    
+    */
+
+    // help
     cli.addCommand("help", [](const std::vector<std::string>&) {
         std::cout
             << "Available commands:\n"
             << "  echo <text...>\n"
+            << "  broadcast <text...>\n"
             << "  add <a> <b> ...\n"
             << "  help\n"
             << "  exit\n";

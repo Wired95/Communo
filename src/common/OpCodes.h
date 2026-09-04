@@ -15,7 +15,7 @@ enum eOpcodes : uint16_t
     // Client messages
     CMSG_ECHO_REQUEST       = 0x0001,
     CMSG_ADDITION_REQUEST   = 0x0002,
-    CMSG_BROADCAST_MESSAGE  = 0x0003, // todo
+    CMSG_BROADCAST_MESSAGE  = 0x0003,
     CMSG_GET_CLIENT_LIST    = 0x0004, // todo
     CMSG_SEND_MSG_TO_CLIENT = 0x0005, // todo
     CMSG_UPTIME             = 0x0006, // todo
@@ -29,7 +29,7 @@ enum eOpcodes : uint16_t
 
     SMSG_ECHO_REQUEST       = 0x1001,
     SMSG_ADDITION_REQUEST   = 0x1002,
-    SMSG_BROADCAST          = 0x1003, // todo
+    SMSG_BROADCAST          = 0x1003,
     SMSG_CLIENT_LIST        = 0x1004, // todo
     SMSG_PRIVATE_MESSAGE    = 0x1005, // todo
     SMSG_UPTIME             = 0x1006, // todo

@@ -322,6 +322,14 @@ void Client::processReplyFromServerIfAny()
                           << '\n' << std::flush;
                 break;
             }
+            case SMSG_BROADCAST:
+            {
+                std::cout << "\rReceived broadcast "
+                          << OPCODE_STR(SMSG_BROADCAST)
+                          << ": " << payload
+                          << '\n' << std::flush;
+                break;
+            }
             default:
                 std::cout << "\rReceived unknown opcode: "
                           << opcode
@@ -406,6 +414,44 @@ void Client::sendAdditionRequest(const std::vector<Number> numbers)
         std::cerr << "Too much numbers to send, aborting server call..." << std::endl;
         return;
     }
+
+    int sent = SSL_write(
+        m_ssl,
+        replyStr.data(),
+        static_cast<int>(replyStr.size())
+    );
+
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(m_ssl, sent);
+
+        std::cerr << "SSL_write() failed. SSL error: "
+                  << sslError << '\n';
+
+        ERR_print_errors_fp(stderr);
+        return;
+    }
+
+    if (sent != static_cast<int>(replyStr.size()))
+    {
+        std::cerr << "SSL_write() sent only "
+                  << sent << " of "
+                  << replyStr.size()
+                  << " bytes\n";
+    }
+}
+
+void Client::sendBroadcast(std::string const msg)
+{
+    std::string replyStr;
+
+    uint16_t opcode = htons(CMSG_BROADCAST_MESSAGE);
+    replyStr.append(
+        reinterpret_cast<const char*>(&opcode),
+        sizeof(opcode)
+    );
+
+    replyStr += msg;
 
     int sent = SSL_write(
         m_ssl,

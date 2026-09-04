@@ -48,6 +48,7 @@ public:
 
     void sendEchoRequest(std::string msg);
     void sendAdditionRequest(const std::vector<Number> numbers);
+    void sendBroadcast(std::string const msg);
 
 private:
     unsigned long long m_Sock;

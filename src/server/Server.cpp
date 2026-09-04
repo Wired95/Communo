@@ -584,6 +584,18 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
                 CallHandlerAdd(client, offset, payloadSize);
 
             break;
+
+        case CMSG_BROADCAST_MESSAGE:
+            // extract the message here
+            _payload = std::string(buffer + sizeof(opcode), payloadSize - sizeof(opcode));
+
+            connLog << OPCODE_STR(CMSG_BROADCAST_MESSAGE) << std::endl;
+            connLog << "payload: " << _payload.c_str();
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            CallHandlerBroadcast(_payload);
+            break;
+            break;
         default:
             // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
             uint16_t CMSG_UNKNOWN_OPCODE = opcode;
@@ -686,4 +698,44 @@ void Server::CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize
     }
     
     sLog.log(LOG_FLAG_DEBUG, connLog.str());
+}
+
+void Server::CallHandlerBroadcast(std::string const stream)
+{
+    std::string packet;
+
+    unsigned short int ropcode = htons(SMSG_BROADCAST);
+    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+    packet += stream;
+
+    std::stringstream connLog;
+    connLog << "Sending opcode: " << OPCODE_STR(SMSG_BROADCAST);
+    connLog << " (size:" << packet.size() << ")" << std::endl;
+    connLog << "Clients: " << m_ClientSocket.size();
+    sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+    for (ClientSocket& client : m_ClientSocket)
+    {
+        if (!client.sslEnabled)
+            continue;
+
+        int sent = SSL_write(
+            client.ssl,
+            packet.data(),
+            static_cast<int>(packet.size())
+        );
+
+        if (sent <= 0)
+        {
+            int sslError = SSL_get_error(client.ssl, sent);
+
+            std::stringstream errorLog;
+            errorLog << "SSL_write failed for "
+                    << OPCODE_STR(SMSG_ECHO_REQUEST)
+                    << ", SSL error: " << sslError;
+
+            sLog.log(LOG_FLAG_DEBUG, errorLog.str());
+            return;
+        }
+    }
 }
