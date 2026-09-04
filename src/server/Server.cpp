@@ -311,6 +311,9 @@ void Server::InitSocket()
     sLog.log(LOG_FLAG_INFO, "Waiting for connections ...");
 
     m_ServerState = eServerState::STARTED;
+
+    // Store initial start time
+    m_StartTime = std::chrono::steady_clock::now();
 }
 
 void Server::Cleanup()
@@ -597,10 +600,15 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
             break;
         case CMSG_PING:
             connLog << OPCODE_STR(CMSG_PING) << std::endl;
-            connLog << "payload: " << _payload.c_str();
             sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
             CallHandlerPong(client);
+            break;
+        case CMSG_UPTIME:
+            connLog << OPCODE_STR(CMSG_UPTIME) << std::endl;
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            CallHandlerUptime(client);
             break;
         default:
             // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
@@ -756,6 +764,55 @@ void Server::CallHandlerPong(ClientSocket* client)
     std::stringstream connLog;
     connLog << "Sending opcode: " << OPCODE_STR(SMSG_PONG);
     sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+    int sent = SSL_write(
+        client->ssl,
+        packet.data(),
+        static_cast<int>(packet.size())
+    );
+
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(client->ssl, sent);
+
+        std::stringstream errorLog;
+        errorLog << "SSL_write failed for "
+                 << OPCODE_STR(SMSG_ECHO_REQUEST)
+                 << ", SSL error: " << sslError;
+
+        sLog.log(LOG_FLAG_DEBUG, errorLog.str());
+        return;
+    }
+}
+
+void Server::CallHandlerUptime(ClientSocket* client)
+{
+    std::string packet;
+
+    unsigned short int ropcode = htons(SMSG_UPTIME);
+    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+
+    std::stringstream connLog;
+    connLog << "Sending opcode: " << OPCODE_STR(SMSG_UPTIME);
+    sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+    // compute uptime
+    auto now = std::chrono::steady_clock::now();
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
+        now - m_StartTime
+    ).count();
+
+    auto hours = seconds / 3600;
+    seconds %= 3600;
+
+    auto minutes = seconds / 60;
+    seconds %= 60;
+
+    // Format uptime
+    packet += "Uptime: " +
+          std::to_string(hours) + "h " +
+          std::to_string(minutes) + "m " +
+          std::to_string(seconds) + "s";
 
     int sent = SSL_write(
         client->ssl,

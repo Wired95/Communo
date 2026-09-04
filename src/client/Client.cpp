@@ -339,6 +339,12 @@ void Client::processReplyFromServerIfAny()
                     << " ms\n";
                 break;
             }
+            case SMSG_UPTIME:
+                std::cout << "\rReceived uptime "
+                          << OPCODE_STR(SMSG_UPTIME)
+                          << " -> " << payload
+                          << '\n' << std::flush;
+                break;
             default:
                 std::cout << "\rReceived unknown opcode: "
                           << opcode
@@ -499,6 +505,41 @@ void Client::sendPing()
 
     // Store initial ping start
     m_pingStart = std::chrono::steady_clock::now();
+
+    int sent = SSL_write(
+        m_ssl,
+        replyStr.data(),
+        static_cast<int>(replyStr.size())
+    );
+
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(m_ssl, sent);
+
+        std::cerr << "SSL_write() failed. SSL error: "
+                  << sslError << '\n';
+
+        ERR_print_errors_fp(stderr);
+        return;
+    }
+
+    if (sent != static_cast<int>(replyStr.size()))
+    {
+        std::cerr << "SSL_write() sent only "
+                  << sent << " of "
+                  << replyStr.size()
+                  << " bytes\n";
+    }
+}
+
+void Client::sendUptime()
+{
+    std::string replyStr;
+    uint16_t opcode = htons(CMSG_UPTIME);
+    replyStr.append(
+        reinterpret_cast<const char*>(&opcode),
+        sizeof(opcode)
+    );
 
     int sent = SSL_write(
         m_ssl,

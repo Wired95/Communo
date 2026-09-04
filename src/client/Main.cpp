@@ -155,10 +155,14 @@ int main(int argc, char const* argv[])
         client.sendPing();
     });
 
+    // uptime
+    cli.addCommand("uptime", [&client](const std::vector<std::string>&) {
+        client.sendUptime();
+    });
+
     /* todo:
     CMSG_GET_CLIENT_LIST    = 0x0004, // todo
     CMSG_SEND_MSG_TO_CLIENT = 0x0005, // todo
-    CMSG_UPTIME             = 0x0006, // todo
     CMSG_INCREMENT_COUNTER  = 0x0008, // todo
     CMSG_GET_COUNTER        = 0x0009, // todo
     
@@ -173,6 +177,7 @@ int main(int argc, char const* argv[])
             << "  broadcast <text...>\n"
             << "  add <a> <b> ...\n"
             << "  ping\n"
+            << "  uptime\n"
             << "  help\n"
             << "  exit\n";
     });
