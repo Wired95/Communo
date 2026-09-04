@@ -330,6 +330,15 @@ void Client::processReplyFromServerIfAny()
                           << '\n' << std::flush;
                 break;
             }
+            case SMSG_PONG:
+            {
+                auto now = std::chrono::steady_clock::now();
+                auto ping_us = std::chrono::duration_cast<std::chrono::microseconds>(now - m_pingStart).count();
+                std::cout << "Ping: "
+                    << ping_us / 1000.0
+                    << " ms\n";
+                break;
+            }
             default:
                 std::cout << "\rReceived unknown opcode: "
                           << opcode
@@ -452,6 +461,44 @@ void Client::sendBroadcast(std::string const msg)
     );
 
     replyStr += msg;
+
+    int sent = SSL_write(
+        m_ssl,
+        replyStr.data(),
+        static_cast<int>(replyStr.size())
+    );
+
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(m_ssl, sent);
+
+        std::cerr << "SSL_write() failed. SSL error: "
+                  << sslError << '\n';
+
+        ERR_print_errors_fp(stderr);
+        return;
+    }
+
+    if (sent != static_cast<int>(replyStr.size()))
+    {
+        std::cerr << "SSL_write() sent only "
+                  << sent << " of "
+                  << replyStr.size()
+                  << " bytes\n";
+    }
+}
+
+void Client::sendPing()
+{
+    std::string replyStr;
+    uint16_t opcode = htons(CMSG_PING);
+    replyStr.append(
+        reinterpret_cast<const char*>(&opcode),
+        sizeof(opcode)
+    );
+
+    // Store initial ping start
+    m_pingStart = std::chrono::steady_clock::now();
 
     int sent = SSL_write(
         m_ssl,

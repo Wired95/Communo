@@ -9,6 +9,7 @@
 #include <openssl/err.h>
 
 #include <vector>
+#include <chrono>
 
 #ifdef _WIN32
 
@@ -49,11 +50,14 @@ public:
     void sendEchoRequest(std::string msg);
     void sendAdditionRequest(const std::vector<Number> numbers);
     void sendBroadcast(std::string const msg);
+    void sendPing();
 
 private:
     unsigned long long m_Sock;
     SSL_CTX* m_ctx;
     SSL* m_ssl;
+
+    std::chrono::steady_clock::time_point m_pingStart;
 };
 
 #endif // _CLIENT_H_

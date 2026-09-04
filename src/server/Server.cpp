@@ -595,6 +595,12 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
 
             CallHandlerBroadcast(_payload);
             break;
+        case CMSG_PING:
+            connLog << OPCODE_STR(CMSG_PING) << std::endl;
+            connLog << "payload: " << _payload.c_str();
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            CallHandlerPong(client);
             break;
         default:
             // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
@@ -737,5 +743,36 @@ void Server::CallHandlerBroadcast(std::string const stream)
             sLog.log(LOG_FLAG_DEBUG, errorLog.str());
             return;
         }
+    }
+}
+
+void Server::CallHandlerPong(ClientSocket* client)
+{
+    std::string packet;
+
+    unsigned short int ropcode = htons(SMSG_PONG);
+    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+
+    std::stringstream connLog;
+    connLog << "Sending opcode: " << OPCODE_STR(SMSG_PONG);
+    sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+    int sent = SSL_write(
+        client->ssl,
+        packet.data(),
+        static_cast<int>(packet.size())
+    );
+
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(client->ssl, sent);
+
+        std::stringstream errorLog;
+        errorLog << "SSL_write failed for "
+                 << OPCODE_STR(SMSG_ECHO_REQUEST)
+                 << ", SSL error: " << sslError;
+
+        sLog.log(LOG_FLAG_DEBUG, errorLog.str());
+        return;
     }
 }
