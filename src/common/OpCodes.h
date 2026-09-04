@@ -14,11 +14,15 @@ enum eOpcodes : unsigned short int
 
     // Client messages
     CMSG_ECHO_REQUEST       = 0x0001,
+    CMSG_ADDITION_REQUEST   = 0x0002,
 
     // Server messages
-    SMSG_ECHO_REQUEST       = 0x0FFF,
+    SMSG_MOTD               = 0x0FFF,
     SMSG_MESSAGE            = 0x1000,
-    SMSG_MOTD               = 0x1001,
+
+    SMSG_ECHO_REQUEST       = 0x1001,
+    SMSG_ADDITION_REQUEST   = 0x1002,
+
     
 
     OPCODE_MAX              = (0x7FFF+1),

@@ -3,6 +3,7 @@
 
 #include "SharedDefinitions.h"
 #include "NetworkHeaders.h"
+#include "NumParser.h"
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -44,6 +45,7 @@ public:
     void processReplyFromServerIfAny();
 
     void sendEchoRequest(std::string msg);
+    void sendAdditionRequest(Number a, Number b);
 
 private:
     unsigned long long m_Sock;

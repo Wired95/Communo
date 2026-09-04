@@ -109,14 +109,26 @@ int main(int argc, char const* argv[])
         client.sendEchoRequest(replyStr);
     });
 
-    cli.addCommand("add", [](const std::vector<std::string>& args)  {
+    cli.addCommand("add", [&client](const std::vector<std::string>& args)  {
         if (args.size() != 2)
             throw std::runtime_error("usage: add <a> <b>");
 
-        int a = std::stoi(args[0]);
-        int b = std::stoi(args[1]);
+        Number a, b;
+        bool validNumbers = true;
+        try
+        {
+            a = parse_number(args[0]);
+            b = parse_number(args[1]);
+        }
+        catch (const std::exception& e)
+        {
+            validNumbers = false;
+            std::cout << "invalid numbers: " << e.what() << '\n';
+        }
 
-        std::cout << a + b << '\n';
+        if (validNumbers)
+            client.sendAdditionRequest(a, b);
+
     });
 
     cli.addCommand("help", [](const std::vector<std::string>&) {
@@ -135,6 +147,7 @@ int main(int argc, char const* argv[])
     t.detach();
 
     cli.run(client);
+    g_Running = false;
 
     return 0;
 }

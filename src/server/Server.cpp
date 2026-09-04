@@ -12,6 +12,7 @@
 #include "Server.h"
 #include "DebugUtils.h"
 #include "OpCodes.h"
+#include "NumParser.h"
 
 #ifdef _WIN32
 
@@ -553,9 +554,13 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
     connLog << "Received opcode: ";
 
     std::string _payload; // CMSG_ECHO_REQUEST
+    
+
+    size_t offset, minSize; // CMSG_ADDITION_REQUEST
 
     switch (opcode) {
         case CMSG_ECHO_REQUEST:
+            // extract the message here
             _payload = std::string(buffer + sizeof(opcode), payloadSize - sizeof(opcode));
 
             connLog << OPCODE_STR(CMSG_ECHO_REQUEST) << std::endl;
@@ -564,6 +569,23 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
 
             CallHandlerEcho(client, _payload);
             break;
+        case CMSG_ADDITION_REQUEST:
+            connLog << OPCODE_STR(CMSG_ADDITION_REQUEST) << std::endl;
+
+            // check minimal required packet size
+            offset = sizeof(opcode);
+            //        opcode + number types             + smallest numbers (2)
+            minSize = offset + sizeof(eNumberTypes) * 2 + sizeof(uint8_t) * 2;
+
+            if (minSize > payloadSize)
+                connLog << "Invalid opcode length, aborting handler call" << std::endl;
+            
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            if (minSize <= payloadSize)
+                CallHandlerAdd(client, offset);
+
+            break;
         default:
             // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
             uint16_t CMSG_UNKNOWN_OPCODE = opcode;
@@ -571,8 +593,7 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
             sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
             // Send reply to the client
-            std::string errMsg = "Unknown opcode: ";
-            errMsg += opcode;
+            std::string errMsg = "Unknown or unhandled opcode.";
             SendMsgToSocket(client, errMsg);
             break;
     }
@@ -609,4 +630,63 @@ void Server::CallHandlerEcho(ClientSocket* client, std::string reply)
         sLog.log(LOG_FLAG_DEBUG, errorLog.str());
         return;
     }
+}
+
+void Server::CallHandlerAdd(ClientSocket* client, size_t offset)
+{
+    std::stringstream connLog;
+
+    // Get number types to parse
+    eNumberTypes typeA = static_cast<eNumberTypes>(static_cast<uint8_t>(buffer[offset++]));
+    eNumberTypes typeB = static_cast<eNumberTypes>(static_cast<uint8_t>(buffer[offset++]));
+
+    // Retrieve number values
+    Number a = read_number(buffer, offset, typeA);
+    Number b = read_number(buffer, offset, typeB);
+
+    connLog << "Number type A:" << std::to_string(typeA) << " -> " << number_to_string(a) << std::endl;
+    connLog << "Number type B:" << std::to_string(typeB) << " -> " << number_to_string(b) << std::endl;
+            
+    // cast everithing to double and perform the sum
+    double vala = std::visit([](auto v) {
+                 return static_cast<double>(v);
+            }, a);
+
+    double valb = std::visit([](auto v) {
+                return static_cast<double>(v);
+            }, b);
+
+    double sum = vala + valb;
+    connLog << "Sum: " << std::to_string(sum) << std::endl;
+
+    // generate response packet
+    std::string packet;
+    unsigned short int ropcode = htons(SMSG_ADDITION_REQUEST);
+    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char*>(&sum), sizeof(sum));
+
+    // send response packet
+    connLog << "Sending opcode: " << OPCODE_STR(SMSG_ADDITION_REQUEST);
+    connLog << " (size:" << packet.size() << ")";
+
+    int sent = SSL_write(
+        client->ssl,
+        packet.data(),
+        static_cast<int>(packet.size())
+    );
+
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(client->ssl, sent);
+
+        std::stringstream errorLog;
+        errorLog << "SSL_write failed for "
+                 << OPCODE_STR(SMSG_ECHO_REQUEST)
+                 << ", SSL error: " << sslError;
+
+        sLog.log(LOG_FLAG_DEBUG, errorLog.str());
+        return;
+    }
+    
+    sLog.log(LOG_FLAG_DEBUG, connLog.str());
 }

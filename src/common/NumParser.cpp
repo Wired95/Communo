@@ -1,5 +1,9 @@
 #include "NumParser.h"
 
+#include <cstring>
+#include <cstdint>
+#include <stdexcept>
+
 // Integer parsing
 template<typename T>
 bool parse_integer(std::string_view s, T& value, int base = 10)
@@ -33,6 +37,13 @@ bool parse_float(std::string_view s, T& value)
     return end == tmp.c_str() + tmp.size();
 }
 
+// Display a Number as a string
+std::string number_to_string(const Number& number)
+{
+    return std::visit([](auto value) {
+        return std::to_string(value);
+    }, number);
+}
 
 // Integer suffix removal
 std::pair<std::string_view, IntegerSuffix>
@@ -270,31 +281,138 @@ void print_number(const Number& number)
 
 eNumberTypes get_number_type(const Number& number)
 {
-    std::visit([](auto value)
+    eNumberTypes encodedType = N_UNK;
+
+    std::visit([&encodedType](auto value)
     {
         using T = decltype(value);
 
         if constexpr (std::is_same_v<T, int8_t>)
-            return N_INT8;
+            encodedType = N_INT8;
         else if constexpr (std::is_same_v<T, uint8_t>)
-            return N_UINT8;
+            encodedType = N_UINT8;
         else if constexpr (std::is_same_v<T, int16_t>)
-            return N_INT16;
+            encodedType = N_INT16;
         else if constexpr (std::is_same_v<T, uint16_t>)
-            return N_UINT16;
+            encodedType = N_UINT16;
         else if constexpr (std::is_same_v<T, int32_t>)
-            return N_INT32;
+            encodedType = N_INT32;
         else if constexpr (std::is_same_v<T, uint32_t>)
-            return N_UINT32;
+            encodedType = N_UINT32;
         else if constexpr (std::is_same_v<T, int64_t>)
-            return N_INT64;
+            encodedType = N_INT64;
         else if constexpr (std::is_same_v<T, uint64_t>)
-           return N_UINT64;
+            encodedType = N_UINT64;
         else if constexpr (std::is_same_v<T, float>)
-            return N_FLOAT;
+            encodedType = N_FLOAT;
         else if constexpr (std::is_same_v<T, double>)
-            return N_DOUBLE;
+            encodedType = N_DOUBLE;
+
     }, number);
 
-    return N_UNK;
+    return encodedType;
+}
+
+// Append the right amount of Bytes required by the number type to a string
+void append_number(std::string& replyStr, const Number& number)
+{
+    std::visit([&](auto value)
+    {
+        using T = decltype(value);
+
+        replyStr.append(
+            reinterpret_cast<const char*>(&value),
+            sizeof(T)
+        );
+
+    }, number);
+}
+
+Number read_number(const char* buffer, size_t& offset, eNumberTypes type)
+{
+    switch (type)
+    {
+        case N_INT8:
+        {
+            int8_t value;
+            std::memcpy(&value, buffer + offset, sizeof(value));
+            offset += sizeof(value);
+            return value;
+        }
+
+        case N_UINT8:
+        {
+            uint8_t value;
+            std::memcpy(&value, buffer + offset, sizeof(value));
+            offset += sizeof(value);
+            return value;
+        }
+
+        case N_INT16:
+        {
+            int16_t value;
+            std::memcpy(&value, buffer + offset, sizeof(value));
+            offset += sizeof(value);
+            return value;
+        }
+
+        case N_UINT16:
+        {
+            uint16_t value;
+            std::memcpy(&value, buffer + offset, sizeof(value));
+            offset += sizeof(value);
+            return value;
+        }
+
+        case N_INT32:
+        {
+            int32_t value;
+            std::memcpy(&value, buffer + offset, sizeof(value));
+            offset += sizeof(value);
+            return value;
+        }
+
+        case N_UINT32:
+        {
+            uint32_t value;
+            std::memcpy(&value, buffer + offset, sizeof(value));
+            offset += sizeof(value);
+            return value;
+        }
+
+        case N_INT64:
+        {
+            int64_t value;
+            std::memcpy(&value, buffer + offset, sizeof(value));
+            offset += sizeof(value);
+            return value;
+        }
+
+        case N_UINT64:
+        {
+            uint64_t value;
+            std::memcpy(&value, buffer + offset, sizeof(value));
+            offset += sizeof(value);
+            return value;
+        }
+
+        case N_FLOAT:
+        {
+            float value;
+            std::memcpy(&value, buffer + offset, sizeof(value));
+            offset += sizeof(value);
+            return value;
+        }
+
+        case N_DOUBLE:
+        {
+            double value;
+            std::memcpy(&value, buffer + offset, sizeof(value));
+            offset += sizeof(value);
+            return value;
+        }
+
+        default:
+            throw std::runtime_error("Unknown number type");
+    }
 }

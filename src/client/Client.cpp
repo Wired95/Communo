@@ -356,3 +356,50 @@ void Client::sendEchoRequest(std::string msg)
                   << " bytes\n";
     }
 }
+
+void Client::sendAdditionRequest(Number a, Number b)
+{
+    std::string replyStr;
+
+    // Write opcode
+    uint16_t opcode = htons(CMSG_ADDITION_REQUEST);
+    replyStr.append(
+        reinterpret_cast<const char*>(&opcode),
+        sizeof(opcode)
+    );
+
+    // Write number types
+    eNumberTypes typeA = get_number_type(a);
+    eNumberTypes typeB = get_number_type(b);
+    replyStr.push_back(static_cast<char>(typeA));
+    replyStr.push_back(static_cast<char>(typeB));
+
+    // Write numbers bytes
+    append_number(replyStr, a);
+    append_number(replyStr, b);
+
+    int sent = SSL_write(
+        m_ssl,
+        replyStr.data(),
+        static_cast<int>(replyStr.size())
+    );
+
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(m_ssl, sent);
+
+        std::cerr << "SSL_write() failed. SSL error: "
+                  << sslError << '\n';
+
+        ERR_print_errors_fp(stderr);
+        return;
+    }
+
+    if (sent != static_cast<int>(replyStr.size()))
+    {
+        std::cerr << "SSL_write() sent only "
+                  << sent << " of "
+                  << replyStr.size()
+                  << " bytes\n";
+    }
+}
