@@ -305,7 +305,23 @@ void Client::processReplyFromServerIfAny()
                           << ": " << payload
                           << '\n' << std::flush;
                 break;
+            case SMSG_ADDITION_REQUEST:
+            {
+                double value;
 
+                if (payload.size() < sizeof(double)) {
+                    // invalid / incomplete payload
+                    throw std::runtime_error("Payload too small for double");
+                }
+
+                std::memcpy(&value, payload.data(), sizeof(double));
+
+                std::cout << "\rReceived Result "
+                          << OPCODE_STR(SMSG_ADDITION_REQUEST)
+                          << ": " << std::to_string(value)
+                          << '\n' << std::flush;
+                break;
+            }
             default:
                 std::cout << "\rReceived unknown opcode: "
                           << opcode

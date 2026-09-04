@@ -8,7 +8,7 @@
               << static_cast<uint16_t>(x) \
               << ")]"
 
-enum eOpcodes : unsigned short int
+enum eOpcodes : uint16_t
 {
     OPCODE_START            = 0x0000,
 
