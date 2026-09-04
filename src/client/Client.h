@@ -8,6 +8,8 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include <vector>
+
 #ifdef _WIN32
 
 #include <winsock2.h>
@@ -45,7 +47,7 @@ public:
     void processReplyFromServerIfAny();
 
     void sendEchoRequest(std::string msg);
-    void sendAdditionRequest(Number a, Number b);
+    void sendAdditionRequest(const std::vector<Number> numbers);
 
 private:
     unsigned long long m_Sock;

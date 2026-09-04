@@ -110,15 +110,18 @@ int main(int argc, char const* argv[])
     });
 
     cli.addCommand("add", [&client](const std::vector<std::string>& args)  {
-        if (args.size() != 2)
-            throw std::runtime_error("usage: add <a> <b>");
+        if (args.size() < 2)
+            throw std::runtime_error("usage: add <a> <b> ...");
 
-        Number a, b;
+        std::vector<Number> nums;
         bool validNumbers = true;
         try
         {
-            a = parse_number(args[0]);
-            b = parse_number(args[1]);
+            for (auto arg : args)
+            {
+                Number num = parse_number(arg);
+                nums.push_back(num);
+            }
         }
         catch (const std::exception& e)
         {
@@ -127,7 +130,7 @@ int main(int argc, char const* argv[])
         }
 
         if (validNumbers)
-            client.sendAdditionRequest(a, b);
+            client.sendAdditionRequest(nums);
 
     });
 
@@ -135,7 +138,7 @@ int main(int argc, char const* argv[])
         std::cout
             << "Available commands:\n"
             << "  echo <text...>\n"
-            << "  add <a> <b>\n"
+            << "  add <a> <b> ...\n"
             << "  help\n"
             << "  exit\n";
     });

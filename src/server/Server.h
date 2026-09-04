@@ -117,7 +117,7 @@ private:
 
     void CallHandler(ClientSocket* client, int payloadSize);
     void CallHandlerEcho(ClientSocket* client, std::string reply);
-    void CallHandlerAdd(ClientSocket* client, size_t offset);
+    void CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize);
 };
 
 #endif // _SERVER_H_

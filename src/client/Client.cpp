@@ -373,9 +373,15 @@ void Client::sendEchoRequest(std::string msg)
     }
 }
 
-void Client::sendAdditionRequest(Number a, Number b)
+void Client::sendAdditionRequest(const std::vector<Number> numbers)
 {
     std::string replyStr;
+
+    if (numbers.size() < 2)
+    {
+        std::cerr << "Not enough numbers to send, aborting server call..." << std::endl;
+        return;
+    }
 
     // Write opcode
     uint16_t opcode = htons(CMSG_ADDITION_REQUEST);
@@ -384,15 +390,22 @@ void Client::sendAdditionRequest(Number a, Number b)
         sizeof(opcode)
     );
 
-    // Write number types
-    eNumberTypes typeA = get_number_type(a);
-    eNumberTypes typeB = get_number_type(b);
-    replyStr.push_back(static_cast<char>(typeA));
-    replyStr.push_back(static_cast<char>(typeB));
+    // Write packet like [type1][num1 bytes][type2][num2 bytes]...
+    for (Number num : numbers)
+    {
+        // Write number type
+        eNumberTypes type = get_number_type(num);
+        replyStr.push_back(static_cast<char>(type));
 
-    // Write numbers bytes
-    append_number(replyStr, a);
-    append_number(replyStr, b);
+        // Write number bytes
+        append_number(replyStr, num);
+    }
+
+    if (replyStr.size() > 4096)
+    {
+        std::cerr << "Too much numbers to send, aborting server call..." << std::endl;
+        return;
+    }
 
     int sent = SSL_write(
         m_ssl,

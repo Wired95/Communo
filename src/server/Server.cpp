@@ -554,8 +554,6 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
     connLog << "Received opcode: ";
 
     std::string _payload; // CMSG_ECHO_REQUEST
-    
-
     size_t offset, minSize; // CMSG_ADDITION_REQUEST
 
     switch (opcode) {
@@ -574,7 +572,7 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
 
             // check minimal required packet size
             offset = sizeof(opcode);
-            //        opcode + number types             + smallest numbers (2)
+            //        opcode + 2 number types           + smallest numbers (2)
             minSize = offset + sizeof(eNumberTypes) * 2 + sizeof(uint8_t) * 2;
 
             if (minSize > payloadSize)
@@ -583,7 +581,7 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
             sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
             if (minSize <= payloadSize)
-                CallHandlerAdd(client, offset);
+                CallHandlerAdd(client, offset, payloadSize);
 
             break;
         default:
@@ -632,31 +630,30 @@ void Server::CallHandlerEcho(ClientSocket* client, std::string reply)
     }
 }
 
-void Server::CallHandlerAdd(ClientSocket* client, size_t offset)
+void Server::CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize)
 {
     std::stringstream connLog;
 
-    // Get number types to parse
-    eNumberTypes typeA = static_cast<eNumberTypes>(static_cast<uint8_t>(buffer[offset++]));
-    eNumberTypes typeB = static_cast<eNumberTypes>(static_cast<uint8_t>(buffer[offset++]));
+    double sum = 0;
 
-    // Retrieve number values
-    Number a = read_number(buffer, offset, typeA);
-    Number b = read_number(buffer, offset, typeB);
+    while (offset < payloadSize)
+    {
+        // Get number types to parse
+        eNumberTypes type = static_cast<eNumberTypes>(static_cast<uint8_t>(buffer[offset++]));
 
-    connLog << "Number type A:" << std::to_string(typeA) << " -> " << number_to_string(a) << std::endl;
-    connLog << "Number type B:" << std::to_string(typeB) << " -> " << number_to_string(b) << std::endl;
-            
-    // cast everithing to double and perform the sum
-    double vala = std::visit([](auto v) {
+        // Retrieve number values
+        Number num = read_number(buffer, offset, type);
+
+        sLog.log(LOG_FLAG_DEBUG, std::string("Number type:") + std::to_string(type) + " -> " + number_to_string(num));
+
+        // cast everithing to double and perform the sum
+        double val = std::visit([](auto v) {
                  return static_cast<double>(v);
-            }, a);
+            }, num);
 
-    double valb = std::visit([](auto v) {
-                return static_cast<double>(v);
-            }, b);
+        sum += val;
+    }
 
-    double sum = vala + valb;
     connLog << "Sum: " << std::to_string(sum) << std::endl;
 
     // generate response packet
