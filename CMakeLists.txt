@@ -40,6 +40,7 @@ add_library(Common STATIC
     src/common/Logging.cpp
     src/common/NumParser.h
     src/common/NumParser.cpp
+    src/common/Singleton.h
 )
 
 # Server scripts
