@@ -305,7 +305,46 @@ void Client::processReplyFromServerIfAny()
                           << ": " << payload
                           << '\n' << std::flush;
                 break;
+            case SMSG_ADDITION_REQUEST:
+            {
+                double value;
 
+                if (payload.size() < sizeof(double)) {
+                    // invalid / incomplete payload
+                    throw std::runtime_error("Payload too small for double");
+                }
+
+                std::memcpy(&value, payload.data(), sizeof(double));
+
+                std::cout << "\rReceived Result "
+                          << OPCODE_STR(SMSG_ADDITION_REQUEST)
+                          << ": " << std::to_string(value)
+                          << '\n' << std::flush;
+                break;
+            }
+            case SMSG_BROADCAST:
+            {
+                std::cout << "\rReceived broadcast "
+                          << OPCODE_STR(SMSG_BROADCAST)
+                          << ": " << payload
+                          << '\n' << std::flush;
+                break;
+            }
+            case SMSG_PONG:
+            {
+                auto now = std::chrono::steady_clock::now();
+                auto ping_us = std::chrono::duration_cast<std::chrono::microseconds>(now - m_pingStart).count();
+                std::cout << "Ping: "
+                    << ping_us / 1000.0
+                    << " ms\n";
+                break;
+            }
+            case SMSG_UPTIME:
+                std::cout << "\rReceived uptime "
+                          << OPCODE_STR(SMSG_UPTIME)
+                          << " -> " << payload
+                          << '\n' << std::flush;
+                break;
             default:
                 std::cout << "\rReceived unknown opcode: "
                           << opcode
@@ -330,6 +369,177 @@ void Client::sendEchoRequest(std::string msg)
     );
 
     replyStr += msg;
+
+    int sent = SSL_write(
+        m_ssl,
+        replyStr.data(),
+        static_cast<int>(replyStr.size())
+    );
+
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(m_ssl, sent);
+
+        std::cerr << "SSL_write() failed. SSL error: "
+                  << sslError << '\n';
+
+        ERR_print_errors_fp(stderr);
+        return;
+    }
+
+    if (sent != static_cast<int>(replyStr.size()))
+    {
+        std::cerr << "SSL_write() sent only "
+                  << sent << " of "
+                  << replyStr.size()
+                  << " bytes\n";
+    }
+}
+
+void Client::sendAdditionRequest(const std::vector<Number> numbers)
+{
+    std::string replyStr;
+
+    if (numbers.size() < 2)
+    {
+        std::cerr << "Not enough numbers to send, aborting server call..." << std::endl;
+        return;
+    }
+
+    // Write opcode
+    uint16_t opcode = htons(CMSG_ADDITION_REQUEST);
+    replyStr.append(
+        reinterpret_cast<const char*>(&opcode),
+        sizeof(opcode)
+    );
+
+    // Write packet like [type1][num1 bytes][type2][num2 bytes]...
+    for (Number num : numbers)
+    {
+        // Write number type
+        eNumberTypes type = get_number_type(num);
+        replyStr.push_back(static_cast<char>(type));
+
+        // Write number bytes
+        append_number(replyStr, num);
+    }
+
+    if (replyStr.size() > 4096)
+    {
+        std::cerr << "Too much numbers to send, aborting server call..." << std::endl;
+        return;
+    }
+
+    int sent = SSL_write(
+        m_ssl,
+        replyStr.data(),
+        static_cast<int>(replyStr.size())
+    );
+
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(m_ssl, sent);
+
+        std::cerr << "SSL_write() failed. SSL error: "
+                  << sslError << '\n';
+
+        ERR_print_errors_fp(stderr);
+        return;
+    }
+
+    if (sent != static_cast<int>(replyStr.size()))
+    {
+        std::cerr << "SSL_write() sent only "
+                  << sent << " of "
+                  << replyStr.size()
+                  << " bytes\n";
+    }
+}
+
+void Client::sendBroadcast(std::string const msg)
+{
+    std::string replyStr;
+
+    uint16_t opcode = htons(CMSG_BROADCAST_MESSAGE);
+    replyStr.append(
+        reinterpret_cast<const char*>(&opcode),
+        sizeof(opcode)
+    );
+
+    replyStr += msg;
+
+    int sent = SSL_write(
+        m_ssl,
+        replyStr.data(),
+        static_cast<int>(replyStr.size())
+    );
+
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(m_ssl, sent);
+
+        std::cerr << "SSL_write() failed. SSL error: "
+                  << sslError << '\n';
+
+        ERR_print_errors_fp(stderr);
+        return;
+    }
+
+    if (sent != static_cast<int>(replyStr.size()))
+    {
+        std::cerr << "SSL_write() sent only "
+                  << sent << " of "
+                  << replyStr.size()
+                  << " bytes\n";
+    }
+}
+
+void Client::sendPing()
+{
+    std::string replyStr;
+    uint16_t opcode = htons(CMSG_PING);
+    replyStr.append(
+        reinterpret_cast<const char*>(&opcode),
+        sizeof(opcode)
+    );
+
+    // Store initial ping start
+    m_pingStart = std::chrono::steady_clock::now();
+
+    int sent = SSL_write(
+        m_ssl,
+        replyStr.data(),
+        static_cast<int>(replyStr.size())
+    );
+
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(m_ssl, sent);
+
+        std::cerr << "SSL_write() failed. SSL error: "
+                  << sslError << '\n';
+
+        ERR_print_errors_fp(stderr);
+        return;
+    }
+
+    if (sent != static_cast<int>(replyStr.size()))
+    {
+        std::cerr << "SSL_write() sent only "
+                  << sent << " of "
+                  << replyStr.size()
+                  << " bytes\n";
+    }
+}
+
+void Client::sendUptime()
+{
+    std::string replyStr;
+    uint16_t opcode = htons(CMSG_UPTIME);
+    replyStr.append(
+        reinterpret_cast<const char*>(&opcode),
+        sizeof(opcode)
+    );
 
     int sent = SSL_write(
         m_ssl,

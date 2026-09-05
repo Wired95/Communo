@@ -100,6 +100,11 @@ int main(int argc, char const* argv[])
     if (!client.initTLS())
         return -1;
 
+    /* *********************************************************** */
+    /* *********************** CLI options *********************** */
+    /* *********************************************************** */
+
+    // echo ...
     cli.addCommand("echo", [&client](const std::vector<std::string>& args) {
         std::string replyStr;
 
@@ -109,21 +114,70 @@ int main(int argc, char const* argv[])
         client.sendEchoRequest(replyStr);
     });
 
-    cli.addCommand("add", [](const std::vector<std::string>& args)  {
-        if (args.size() != 2)
-            throw std::runtime_error("usage: add <a> <b>");
+    // add <a> <b> ...
+    cli.addCommand("add", [&client](const std::vector<std::string>& args)  {
+        if (args.size() < 2)
+            throw std::runtime_error("usage: add <a> <b> ...");
 
-        int a = std::stoi(args[0]);
-        int b = std::stoi(args[1]);
+        std::vector<Number> nums;
+        bool validNumbers = true;
+        try
+        {
+            for (auto arg : args)
+            {
+                Number num = parse_number(arg);
+                nums.push_back(num);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            validNumbers = false;
+            std::cout << "invalid numbers: " << e.what() << '\n';
+        }
 
-        std::cout << a + b << '\n';
+        if (validNumbers)
+            client.sendAdditionRequest(nums);
+
     });
 
+    // broadcast ...
+    cli.addCommand("broadcast", [&client](const std::vector<std::string>& args) {
+        std::string replyStr;
+
+        for (const std::string& arg : args)
+            replyStr += arg + ' ';
+
+        client.sendBroadcast(replyStr);
+    });
+
+    // ping
+    cli.addCommand("ping", [&client](const std::vector<std::string>&) {
+        client.sendPing();
+    });
+
+    // uptime
+    cli.addCommand("uptime", [&client](const std::vector<std::string>&) {
+        client.sendUptime();
+    });
+
+    /* todo:
+    CMSG_GET_CLIENT_LIST    = 0x0004, // todo
+    CMSG_SEND_MSG_TO_CLIENT = 0x0005, // todo
+    CMSG_INCREMENT_COUNTER  = 0x0008, // todo
+    CMSG_GET_COUNTER        = 0x0009, // todo
+    
+    
+    */
+
+    // help
     cli.addCommand("help", [](const std::vector<std::string>&) {
         std::cout
             << "Available commands:\n"
             << "  echo <text...>\n"
-            << "  add <a> <b>\n"
+            << "  broadcast <text...>\n"
+            << "  add <a> <b> ...\n"
+            << "  ping\n"
+            << "  uptime\n"
             << "  help\n"
             << "  exit\n";
     });
@@ -135,6 +189,7 @@ int main(int argc, char const* argv[])
     t.detach();
 
     cli.run(client);
+    g_Running = false;
 
     return 0;
 }

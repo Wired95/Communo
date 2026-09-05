@@ -11,6 +11,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <vector>
+#include <chrono>
 
 enum class eServerState
 {
@@ -93,6 +94,8 @@ public:
 private:
     struct timeval tv;
 
+    std::chrono::steady_clock::time_point m_StartTime;
+
     char buffer[4096];  //data buffer of 4K  
 
     int m_MasterSocket;
@@ -117,6 +120,10 @@ private:
 
     void CallHandler(ClientSocket* client, int payloadSize);
     void CallHandlerEcho(ClientSocket* client, std::string reply);
+    void CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize);
+    void CallHandlerBroadcast(std::string const stream);
+    void CallHandlerPong(ClientSocket* client);
+    void CallHandlerUptime(ClientSocket* client);
 };
 
 #endif // _SERVER_H_
