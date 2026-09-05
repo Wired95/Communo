@@ -53,6 +53,17 @@ The `--debug` option will trigger extra logging information (packet management, 
 
 ## Client
 
-Launch the executable and see what happens / what options are available. The server must be running for the client to work.
+Launch the executable and see what happens / what options are available through the CLI. The server must be running for the client to work.
 
-The current feature involves: echoing a message sent from te client using the CLI + the `> echo <xxx>` command.
+```Bash
+Available commands:
+  echo <text...>
+  broadcast <text...>
+  add <a> <b> ...
+  ping
+  uptime
+  increment-counter
+  get-counter
+  help
+  exit
+```
