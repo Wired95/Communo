@@ -23,14 +23,23 @@ enum eOpcodes : uint16_t
 
     // Client messages
     CMSG_ECHO_REQUEST       = 0x0001,
+
     CMSG_ADDITION_REQUEST   = 0x0002,
+
     CMSG_BROADCAST_MESSAGE  = 0x0003,
+
     CMSG_GET_CLIENT_LIST    = 0x0004, // todo
     CMSG_SEND_MSG_TO_CLIENT = 0x0005, // todo
+
     CMSG_UPTIME             = 0x0006,
     CMSG_PING               = 0x0007,
-    CMSG_INCREMENT_COUNTER  = 0x0008, // todo
-    CMSG_GET_COUNTER        = 0x0009, // todo
+
+    CMSG_INCREMENT_COUNTER  = 0x0008,
+    CMSG_GET_COUNTER        = 0x0009,
+
+    CMSG_GET_CHAT_ROOMS     = 0x000A,
+    CMSG_GET_ROOM_INFO      = 0x000B, // todo, if room id is provided, then display room info, otherwise send current room info
+    CMSG_JOIN_ROOM          = 0x000C, // todo
 
     // Server messages
     SMSG_MOTD               = 0x0FFF,

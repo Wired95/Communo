@@ -2,6 +2,7 @@
 #define _UNIVERSE_H_
 
 #include "Singleton.h"
+#include <cstdint>
 
 class Universe
 {

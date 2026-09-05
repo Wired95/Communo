@@ -498,3 +498,8 @@ void Client::sendGetCounter()
 {
     sendSSLOpcodeToServer(CMSG_GET_COUNTER);
 }
+
+void Client::sendGetChatRooms()
+{
+    sendSSLOpcodeToServer(CMSG_GET_CHAT_ROOMS);
+}

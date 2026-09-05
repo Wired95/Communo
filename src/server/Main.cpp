@@ -186,6 +186,18 @@ int main(int argc, char const *argv[])
         e.SendSystemErrDialogBox();
     }
 
+    // Init Entities
+    try {
+        sLog.log(LOG_FLAG_DEBUG, SERVER_DAEMON_NAME + " InitEntities launched.");
+        server.InitEntities();
+        sLog.log(LOG_FLAG_DEBUG, SERVER_DAEMON_NAME + " InitEntities ended.");
+    }
+    catch (CommunoException& e)
+    {
+        sLog.log(LOG_FLAG_ERROR, SERVER_DAEMON_NAME + " failed to init InitEntities: " + std::string(e.what()));
+        e.SendSystemErrDialogBox();
+    }
+
     sLog.log(LOG_FLAG_INFO, SERVER_DAEMON_NAME + " Server started.");
     
     while (server.getServerState() != eServerState::CLOSED)

@@ -46,6 +46,8 @@ add_library(Common STATIC
 # Server scripts
 if(${BuildType} STREQUAL "server" OR ${BuildType} STREQUAL "all")
     add_executable (Server 
+        src/server/Chat.cpp
+        src/server/Chat.h
         src/server/Main.cpp
         src/server/Server.cpp
         src/server/Server.h

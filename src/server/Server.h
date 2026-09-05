@@ -4,6 +4,7 @@
 #include "SharedDefinitions.h"
 #include "NetworkHeaders.h"
 #include "Logging.h"
+#include "Chat.h"
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -23,8 +24,8 @@ enum class eServerState
 
 struct ClientSocket
 {
-    ClientSocket() : socket(0), sslEnabled(false) {}
-    ClientSocket(int _socket) : socket(_socket), sslEnabled(false) {}
+    ClientSocket() : socket(0), sslEnabled(false), joinedChatRoomID(ROOM_NONE) {}
+    ClientSocket(int _socket) : socket(_socket), sslEnabled(false), joinedChatRoomID(ROOM_NONE) {}
 
     ClientSocket(const ClientSocket&) = delete;
     ClientSocket& operator=(const ClientSocket&) = delete;
@@ -50,6 +51,7 @@ struct ClientSocket
     int socket;
     SSL* ssl;
     bool sslEnabled;
+    uint8_t joinedChatRoomID;
 };
 
 class Server
@@ -61,6 +63,8 @@ public:
     void InitSSL();
 
     void InitSocket();
+
+    void InitEntities();
 
     void Cleanup();
 
@@ -130,6 +134,7 @@ private:
     void CallHandlerPong(ClientSocket* client);
     void CallHandlerUptime(ClientSocket* client);
     void CallHandlerGetCounter(ClientSocket* client);
+    void CallHandlerGetChatRooms(ClientSocket* client);
 };
 
 #endif // _SERVER_H_

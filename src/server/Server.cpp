@@ -14,6 +14,7 @@
 #include "OpCodes.h"
 #include "NumParser.h"
 #include "Universe.h"
+#include "Chat.h"
 
 #ifdef _WIN32
 
@@ -313,8 +314,18 @@ void Server::InitSocket()
 
     m_ServerState = eServerState::STARTED;
 
+    
+}
+
+void Server::InitEntities()
+{
     // Store initial start time
     m_StartTime = std::chrono::steady_clock::now();
+
+    // Load chat rooms
+    sLog.log(LOG_FLAG_DEBUG, "Load Chat rooms ...");
+    sChat.loadChatRooms();
+    sLog.log(LOG_FLAG_DEBUG, "Loaded Chat rooms.");
 }
 
 void Server::Cleanup()
@@ -329,30 +340,13 @@ void Server::SetSendHelloMessagesToNewClients(bool send)
 
 void Server::SendMsgToSocket(ClientSocket* client, const char* msg)
 {
-    std::string reply;
+    std::string packet;
 
     unsigned short int opcode = htons(SMSG_MESSAGE);
-    reply.append(reinterpret_cast<const char*>(&opcode), sizeof(opcode));
-    reply += msg;
+    packet.append(reinterpret_cast<const char*>(&opcode), sizeof(opcode));
+    packet += msg;
 
-    int sent = SSL_write(
-        client->ssl,
-        reply.data(),
-        static_cast<int>(reply.size())
-    );
-
-    if (sent <= 0)
-    {
-        int sslError = SSL_get_error(client->ssl, sent);
-
-        sLog.log(
-            LOG_FLAG_DEBUG,
-            "SMSG_MESSAGE SSL_write failed, error: " +
-            std::to_string(sslError)
-        );
-
-        return;
-    }
+    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_MESSAGE));
 
     sLog.log(LOG_FLAG_DEBUG, "SMSG_MESSAGE sent");
 }
@@ -604,7 +598,7 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
             CallHandlerEcho(client, _payload);
             break;
         case CMSG_ADDITION_REQUEST:
-            connLog << OPCODE_STR(CMSG_ADDITION_REQUEST) << std::endl;
+            connLog << OPCODE_STR(CMSG_ADDITION_REQUEST);
 
             // check minimal required packet size
             offset = sizeof(opcode);
@@ -655,6 +649,14 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
 
             CallHandlerGetCounter(client);
             break;
+        case CMSG_GET_CHAT_ROOMS:
+        {
+            connLog << OPCODE_STR(CMSG_GET_CHAT_ROOMS);
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            CallHandlerGetChatRooms(client);
+            break;
+        }
         default:
             // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
             uint16_t CMSG_UNKNOWN_OPCODE = opcode;
@@ -782,4 +784,9 @@ void Server::CallHandlerGetCounter(ClientSocket* client)
     packet.append(reinterpret_cast<const char*>(&counter), sizeof(counter));
 
     SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_COUNTER));
+}
+
+void Server::CallHandlerGetChatRooms(ClientSocket* client)
+{
+    SendMsgToSocket(client, sChat.getChatRoomsStr());
 }
