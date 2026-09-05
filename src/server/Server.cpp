@@ -13,6 +13,7 @@
 #include "DebugUtils.h"
 #include "OpCodes.h"
 #include "NumParser.h"
+#include "Universe.h"
 
 #ifdef _WIN32
 
@@ -547,6 +548,38 @@ void Server::ProcessRequests()
     }
 }
 
+void Server::SendSSLPacketToClientSocket(ClientSocket* client, 
+        std::string const &packet,
+        const std::string& opcodeFancyName /*= "[SMSG_DEFAULT_OPCODE_NAME (undefined)]"*/)
+{
+    // Log the packet sending
+    std::stringstream connLog;
+    connLog << "Sending opcode: " << opcodeFancyName;
+    connLog << " (size:" << packet.size() << ")";
+    sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+    // Send the packet to the client socket
+    int sent = SSL_write(
+        client->ssl,
+        packet.data(),
+        static_cast<int>(packet.size())
+    );
+
+    // check return codes
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(client->ssl, sent);
+
+        std::stringstream errorLog;
+        errorLog << "SSL_write failed for "
+                 << opcodeFancyName
+                 << ", SSL error: " << sslError;
+
+        sLog.log(LOG_FLAG_DEBUG, errorLog.str());
+        return;
+    }
+}
+
 void Server::CallHandler(ClientSocket* client, int payloadSize)
 {
     unsigned short int opcode;
@@ -610,6 +643,18 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
 
             CallHandlerUptime(client);
             break;
+        case CMSG_INCREMENT_COUNTER:
+            connLog << OPCODE_STR(CMSG_INCREMENT_COUNTER) << std::endl;
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            sUniverse.incrementCounter();
+            break;
+        case CMSG_GET_COUNTER:
+            connLog << OPCODE_STR(CMSG_GET_COUNTER) << std::endl;
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            CallHandlerGetCounter(client);
+            break;
         default:
             // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
             uint16_t CMSG_UNKNOWN_OPCODE = opcode;
@@ -631,29 +676,7 @@ void Server::CallHandlerEcho(ClientSocket* client, std::string reply)
     packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
     packet += reply;
 
-    std::stringstream connLog;
-    connLog << "Sending opcode: " << OPCODE_STR(SMSG_ECHO_REQUEST);
-    connLog << " (size:" << packet.size() << ")";
-    sLog.log(LOG_FLAG_DEBUG, connLog.str());
-
-    int sent = SSL_write(
-        client->ssl,
-        packet.data(),
-        static_cast<int>(packet.size())
-    );
-
-    if (sent <= 0)
-    {
-        int sslError = SSL_get_error(client->ssl, sent);
-
-        std::stringstream errorLog;
-        errorLog << "SSL_write failed for "
-                 << OPCODE_STR(SMSG_ECHO_REQUEST)
-                 << ", SSL error: " << sslError;
-
-        sLog.log(LOG_FLAG_DEBUG, errorLog.str());
-        return;
-    }
+    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_ECHO_REQUEST));
 }
 
 void Server::CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize)
@@ -680,7 +703,7 @@ void Server::CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize
         sum += val;
     }
 
-    connLog << "Sum: " << std::to_string(sum) << std::endl;
+    sLog.log(LOG_FLAG_DEBUG, std::string("Sum: ") + std::to_string(sum));
 
     // generate response packet
     std::string packet;
@@ -688,30 +711,7 @@ void Server::CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize
     packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
     packet.append(reinterpret_cast<const char*>(&sum), sizeof(sum));
 
-    // send response packet
-    connLog << "Sending opcode: " << OPCODE_STR(SMSG_ADDITION_REQUEST);
-    connLog << " (size:" << packet.size() << ")";
-
-    int sent = SSL_write(
-        client->ssl,
-        packet.data(),
-        static_cast<int>(packet.size())
-    );
-
-    if (sent <= 0)
-    {
-        int sslError = SSL_get_error(client->ssl, sent);
-
-        std::stringstream errorLog;
-        errorLog << "SSL_write failed for "
-                 << OPCODE_STR(SMSG_ECHO_REQUEST)
-                 << ", SSL error: " << sslError;
-
-        sLog.log(LOG_FLAG_DEBUG, errorLog.str());
-        return;
-    }
-    
-    sLog.log(LOG_FLAG_DEBUG, connLog.str());
+    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_ADDITION_REQUEST));
 }
 
 void Server::CallHandlerBroadcast(std::string const stream)
@@ -722,35 +722,14 @@ void Server::CallHandlerBroadcast(std::string const stream)
     packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
     packet += stream;
 
-    std::stringstream connLog;
-    connLog << "Sending opcode: " << OPCODE_STR(SMSG_BROADCAST);
-    connLog << " (size:" << packet.size() << ")" << std::endl;
-    connLog << "Clients: " << m_ClientSocket.size();
-    sLog.log(LOG_FLAG_DEBUG, connLog.str());
+    sLog.log(LOG_FLAG_DEBUG, std::string("Known clients: ") + std::to_string(m_ClientSocket.size()));
 
     for (ClientSocket& client : m_ClientSocket)
     {
         if (!client.sslEnabled)
             continue;
 
-        int sent = SSL_write(
-            client.ssl,
-            packet.data(),
-            static_cast<int>(packet.size())
-        );
-
-        if (sent <= 0)
-        {
-            int sslError = SSL_get_error(client.ssl, sent);
-
-            std::stringstream errorLog;
-            errorLog << "SSL_write failed for "
-                    << OPCODE_STR(SMSG_ECHO_REQUEST)
-                    << ", SSL error: " << sslError;
-
-            sLog.log(LOG_FLAG_DEBUG, errorLog.str());
-            return;
-        }
+        SendSSLPacketToClientSocket(&client, packet, OPCODE_OSTR(SMSG_BROADCAST));
     }
 }
 
@@ -761,28 +740,7 @@ void Server::CallHandlerPong(ClientSocket* client)
     unsigned short int ropcode = htons(SMSG_PONG);
     packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
 
-    std::stringstream connLog;
-    connLog << "Sending opcode: " << OPCODE_STR(SMSG_PONG);
-    sLog.log(LOG_FLAG_DEBUG, connLog.str());
-
-    int sent = SSL_write(
-        client->ssl,
-        packet.data(),
-        static_cast<int>(packet.size())
-    );
-
-    if (sent <= 0)
-    {
-        int sslError = SSL_get_error(client->ssl, sent);
-
-        std::stringstream errorLog;
-        errorLog << "SSL_write failed for "
-                 << OPCODE_STR(SMSG_ECHO_REQUEST)
-                 << ", SSL error: " << sslError;
-
-        sLog.log(LOG_FLAG_DEBUG, errorLog.str());
-        return;
-    }
+    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_PONG));
 }
 
 void Server::CallHandlerUptime(ClientSocket* client)
@@ -791,10 +749,6 @@ void Server::CallHandlerUptime(ClientSocket* client)
 
     unsigned short int ropcode = htons(SMSG_UPTIME);
     packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
-
-    std::stringstream connLog;
-    connLog << "Sending opcode: " << OPCODE_STR(SMSG_UPTIME);
-    sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
     // compute uptime
     auto now = std::chrono::steady_clock::now();
@@ -814,22 +768,18 @@ void Server::CallHandlerUptime(ClientSocket* client)
           std::to_string(minutes) + "m " +
           std::to_string(seconds) + "s";
 
-    int sent = SSL_write(
-        client->ssl,
-        packet.data(),
-        static_cast<int>(packet.size())
-    );
+    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_UPTIME));
+}
 
-    if (sent <= 0)
-    {
-        int sslError = SSL_get_error(client->ssl, sent);
+void Server::CallHandlerGetCounter(ClientSocket* client)
+{
+    std::string packet;
 
-        std::stringstream errorLog;
-        errorLog << "SSL_write failed for "
-                 << OPCODE_STR(SMSG_ECHO_REQUEST)
-                 << ", SSL error: " << sslError;
+    unsigned short int ropcode = htons(SMSG_COUNTER);
+    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
 
-        sLog.log(LOG_FLAG_DEBUG, errorLog.str());
-        return;
-    }
+    uint64_t counter = sUniverse.getCounter();
+    packet.append(reinterpret_cast<const char*>(&counter), sizeof(counter));
+
+    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_COUNTER));
 }
