@@ -110,7 +110,7 @@ private:
 
     // Hello msg
     bool m_SendHelloMsg;
-    const char* m_HelloMsg = "Server v1.0 on duty! waiting for commands.\n";
+    const char* m_HelloMsg = "Server v1.0 on duty! waiting for commands.";
     void sendHelloMsg(ClientSocket& socket) {
         SendMOTD(socket);
     }
@@ -118,12 +118,18 @@ private:
     //set of socket descriptors  
     fd_set m_Readfds;
 
+    void SendSSLPacketToClientSocket(ClientSocket* client, 
+        std::string const &packet,
+        const std::string& opcodeFancyName =
+        "[SMSG_DEFAULT_OPCODE_NAME (undefined)]");
+
     void CallHandler(ClientSocket* client, int payloadSize);
     void CallHandlerEcho(ClientSocket* client, std::string reply);
     void CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize);
     void CallHandlerBroadcast(std::string const stream);
     void CallHandlerPong(ClientSocket* client);
     void CallHandlerUptime(ClientSocket* client);
+    void CallHandlerGetCounter(ClientSocket* client);
 };
 
 #endif // _SERVER_H_

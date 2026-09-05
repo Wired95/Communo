@@ -47,11 +47,14 @@ public:
 
     void processReplyFromServerIfAny();
 
+    void sendSSLPacketToServer(const std::string& packet);
     void sendEchoRequest(std::string msg);
     void sendAdditionRequest(const std::vector<Number> numbers);
     void sendBroadcast(std::string const msg);
     void sendPing();
     void sendUptime();
+    void sendIncrementCounter();
+    void sendGetCounter();
 
 private:
     unsigned long long m_Sock;

@@ -49,6 +49,8 @@ if(${BuildType} STREQUAL "server" OR ${BuildType} STREQUAL "all")
         src/server/Main.cpp
         src/server/Server.cpp
         src/server/Server.h
+        src/server/Universe.cpp
+        src/server/Universe.h
     )
 
     target_link_libraries(Server Common)

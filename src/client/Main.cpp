@@ -160,6 +160,16 @@ int main(int argc, char const* argv[])
         client.sendUptime();
     });
 
+    // increment-counter
+    cli.addCommand("increment-counter", [&client](const std::vector<std::string>&) {
+        client.sendIncrementCounter();
+    });
+
+    // get-counter
+    cli.addCommand("get-counter", [&client](const std::vector<std::string>&) {
+        client.sendGetCounter();
+    });
+
     /* todo:
     CMSG_GET_CLIENT_LIST    = 0x0004, // todo
     CMSG_SEND_MSG_TO_CLIENT = 0x0005, // todo
@@ -178,6 +188,8 @@ int main(int argc, char const* argv[])
             << "  add <a> <b> ...\n"
             << "  ping\n"
             << "  uptime\n"
+            << "  increment-counter\n"
+            << "  get-counter\n"
             << "  help\n"
             << "  exit\n";
     });
