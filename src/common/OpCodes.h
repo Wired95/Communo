@@ -8,13 +8,13 @@
               << static_cast<uint16_t>(x) \
               << ")]"
 
-#define OPCODE_OSTR(x)                      \
-    ([&] {                                  \
-        std::ostringstream ss;              \
-        ss << "[" << #x << " (0x"           \
-           << std::uppercase << std::hex    \
-           << static_cast<int>(x) << ")";   \
-        return ss.str();                    \
+#define OPCODE_OSTR(x)                          \
+    ([&] {                                      \
+        std::ostringstream ss;                  \
+        ss << "[" << #x << " (0x"               \
+           << std::uppercase << std::hex        \
+           << static_cast<uint16_t>(x) << ")";  \
+        return ss.str();                        \
     }())
 
 enum eOpcodes : uint16_t

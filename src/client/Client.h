@@ -48,6 +48,7 @@ public:
     void processReplyFromServerIfAny();
 
     void sendSSLPacketToServer(const std::string& packet);
+    void sendSSLOpcodeToServer(const uint16_t opcode);
     void sendEchoRequest(std::string msg);
     void sendAdditionRequest(const std::vector<Number> numbers);
     void sendBroadcast(std::string const msg);

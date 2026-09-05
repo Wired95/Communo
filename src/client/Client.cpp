@@ -396,6 +396,19 @@ void Client::sendSSLPacketToServer(const std::string& packet)
     }
 }
 
+void Client::sendSSLOpcodeToServer(const uint16_t opcode)
+{
+    std::string packet;
+    uint16_t _opcode = htons(opcode);
+
+    packet.append(
+        reinterpret_cast<const char*>(&_opcode),
+        sizeof(_opcode)
+    );
+
+    sendSSLPacketToServer(packet);
+}
+
 void Client::sendEchoRequest(std::string msg)
 {
     std::string packet;
@@ -465,51 +478,23 @@ void Client::sendBroadcast(std::string const msg)
 
 void Client::sendPing()
 {
-    std::string packet;
-    uint16_t opcode = htons(CMSG_PING);
-    packet.append(
-        reinterpret_cast<const char*>(&opcode),
-        sizeof(opcode)
-    );
-
     // Store initial ping start
     m_pingStart = std::chrono::steady_clock::now();
 
-    sendSSLPacketToServer(packet);
+    sendSSLOpcodeToServer(CMSG_PING);
 }
 
 void Client::sendUptime()
 {
-    std::string packet;
-    uint16_t opcode = htons(CMSG_UPTIME);
-    packet.append(
-        reinterpret_cast<const char*>(&opcode),
-        sizeof(opcode)
-    );
-
-    sendSSLPacketToServer(packet);
+    sendSSLOpcodeToServer(CMSG_UPTIME);
 }
 
 void Client::sendIncrementCounter()
 {
-    std::string packet;
-    uint16_t opcode = htons(CMSG_INCREMENT_COUNTER);
-    packet.append(
-        reinterpret_cast<const char*>(&opcode),
-        sizeof(opcode)
-    );
-
-    sendSSLPacketToServer(packet);
+    sendSSLOpcodeToServer(CMSG_INCREMENT_COUNTER);
 }
 
 void Client::sendGetCounter()
 {
-    std::string packet;
-    uint16_t opcode = htons(CMSG_GET_COUNTER);
-    packet.append(
-        reinterpret_cast<const char*>(&opcode),
-        sizeof(opcode)
-    );
-
-    sendSSLPacketToServer(packet);
+    sendSSLOpcodeToServer(CMSG_GET_COUNTER);
 }
