@@ -632,25 +632,25 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
             CallHandlerBroadcast(_payload);
             break;
         case CMSG_PING:
-            connLog << OPCODE_STR(CMSG_PING) << std::endl;
+            connLog << OPCODE_STR(CMSG_PING);
             sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
             CallHandlerPong(client);
             break;
         case CMSG_UPTIME:
-            connLog << OPCODE_STR(CMSG_UPTIME) << std::endl;
+            connLog << OPCODE_STR(CMSG_UPTIME);
             sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
             CallHandlerUptime(client);
             break;
         case CMSG_INCREMENT_COUNTER:
-            connLog << OPCODE_STR(CMSG_INCREMENT_COUNTER) << std::endl;
+            connLog << OPCODE_STR(CMSG_INCREMENT_COUNTER);
             sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
             sUniverse.incrementCounter();
             break;
         case CMSG_GET_COUNTER:
-            connLog << OPCODE_STR(CMSG_GET_COUNTER) << std::endl;
+            connLog << OPCODE_STR(CMSG_GET_COUNTER);
             sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
             CallHandlerGetCounter(client);
