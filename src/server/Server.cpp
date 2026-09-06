@@ -684,6 +684,18 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
 
             break;
         }
+        case CMSG_SAY:
+        {
+            // extract the message here
+            _payload = std::string(buffer + sizeof(opcode), payloadSize - sizeof(opcode));
+
+            connLog << OPCODE_STR(CMSG_SAY) << std::endl;
+            connLog << "payload: " << _payload.c_str();
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            CallHandlerSay(client, _payload);
+            break;
+        }
         default:
             // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
             uint16_t CMSG_UNKNOWN_OPCODE = opcode;
@@ -875,5 +887,51 @@ void Server::CallHandlerJoinRoom(ClientSocket* client, size_t offset, int payloa
         packet.append(reinterpret_cast<const char*>(&error), sizeof(error));
 
         SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_JOIN_CHAT_ROOM_ERR));
+    }
+}
+
+void Server::CallHandlerSay(ClientSocket* client, std::string message)
+{
+    std::string packet = "";
+    uint8_t roomID = client->joinedChatRoomID;
+    unsigned short int ropcode;
+
+    if (sChat.checkRoomID(roomID))
+    {
+        // the room is valid, send that everything is OK
+        ropcode = htons(SMSG_SAY_OK);
+        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+        SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_SAY_OK));
+
+        // prepare message packet
+        packet = "";
+        ropcode = htons(SMSG_SAY);
+        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+        packet += message;
+
+        // Broadcast messages to valid clients
+        for (ClientSocket& _client : m_ClientSocket)
+        {
+            if (!_client.sslEnabled)
+                continue;
+
+            if (_client.joinedChatRoomID != roomID)
+                continue;
+
+            SendSSLPacketToClientSocket(&_client, packet, OPCODE_OSTR(SMSG_BROADCAST));
+        }
+    }
+    else
+    {
+        // the room is not valid, send error message
+        uint8_t error = ERR_INVALID_ROOM;
+        if (roomID == ROOM_NONE)
+            error = ERR_NO_ROOM_JOINED;
+
+        ropcode = htons(SMSG_SAY_ERR);
+        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+        packet.append(reinterpret_cast<const char*>(&error), sizeof(error));
+
+        SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_SAY_ERR));
     }
 }

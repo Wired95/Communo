@@ -59,6 +59,7 @@ public:
     void sendGetChatRooms();
     void sendGetRoomInfo();
     void sendJoinRoomRequest(uint8_t roomID, std::string password);
+    void sendChatSay(std::string const msg);
 
 private:
     unsigned long long m_Sock;

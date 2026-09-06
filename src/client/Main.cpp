@@ -247,8 +247,13 @@ int main(int argc, char const* argv[])
             std::cout << "invalid room number: " << args[0] << std::endl;
     });
 
-    cli.addCommand("chat say", [&client](const std::vector<std::string>&) {
-        std::cout << " chat say\n";
+    cli.addCommand("chat say", [&client](const std::vector<std::string>& args) {
+        std::string msg;
+
+        for (const std::string& arg : args)
+            msg += arg + ' ';
+
+        client.sendChatSay(msg);
     });
 
     // help

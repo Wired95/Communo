@@ -39,8 +39,8 @@ enum eOpcodes : uint16_t
 
     CMSG_GET_CHAT_ROOMS     = 0x000A,
     CMSG_GET_ROOM_INFO      = 0x000B,
-    CMSG_JOIN_ROOM          = 0x000C, // todo
-    CMSG_SAY                = 0x000D, // todo
+    CMSG_JOIN_ROOM          = 0x000C,
+    CMSG_SAY                = 0x000D,
 
     // Server messages
     SMSG_MOTD               = 0x0FFF,
@@ -53,11 +53,12 @@ enum eOpcodes : uint16_t
     SMSG_PRIVATE_MESSAGE    = 0x1005, // todo
     SMSG_UPTIME             = 0x1006,
     SMSG_PONG               = 0x1007,
-    SMSG_COUNTER            = 0x1008, // todo
+    SMSG_COUNTER            = 0x1008,
     SMSG_JOIN_CHAT_ROOM_OK  = 0x1009,
     SMSG_JOIN_CHAT_ROOM_ERR = 0x100A,
-    SMSG_SAY_OK             = 0x100B, // todo
-    SMSG_SAY_ERR            = 0x100C, // todo
+    SMSG_SAY_OK             = 0x100B,
+    SMSG_SAY_ERR            = 0x100C,
+    SMSG_SAY                = 0x100D,
 
     OPCODE_MAX              = (0x7FFF+1),
 };

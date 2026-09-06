@@ -400,6 +400,47 @@ void Client::processReplyFromServerIfAny()
 
                 break;
             }
+            case SMSG_SAY_OK:
+            {
+                std::cout << "\rMessage received, and sent to clients"
+                          << OPCODE_STR(SMSG_JOIN_CHAT_ROOM_OK)
+                          << '\n' << std::flush;
+                break;
+            }
+            case SMSG_SAY_ERR:
+            {
+                uint8_t value;
+                std::memcpy(&value, payload.data(), sizeof(uint8_t));
+
+                std::string errorMessage = "";
+                switch (value) {
+                    case ERR_INVALID_ROOM:
+                        errorMessage = "Invalid room ID.";
+                        break;
+                    case ERR_NO_ROOM_JOINED:
+                        errorMessage = "No room joined.";
+                        break;
+                    case ERR_OK:
+                    default:
+                        errorMessage = "Something went wrong.";
+                        break;
+                }
+
+                std::cout << "\rMessage not sent "
+                          << OPCODE_STR(SMSG_SAY_ERR)
+                          << " -> err: " << std::to_string(value)
+                          << "\n" << errorMessage
+                          << '\n' << std::flush;
+                break;
+            }
+            case SMSG_SAY:
+            {
+                std::cout << "\rReceived room message "
+                          << OPCODE_STR(SMSG_SAY)
+                          << ": " << payload
+                          << '\n' << std::flush;
+                break;
+            }
             default:
                 std::cout << "\rReceived unknown opcode: "
                           << opcode
@@ -575,6 +616,21 @@ void Client::sendJoinRoomRequest(uint8_t roomID, std::string password)
         reinterpret_cast<const char*>(&hash),
         sizeof(hash)
     );
+
+    sendSSLPacketToServer(packet);
+}
+
+void Client::sendChatSay(std::string const msg)
+{
+    std::string packet;
+
+    uint16_t opcode = htons(CMSG_SAY);
+    packet.append(
+        reinterpret_cast<const char*>(&opcode),
+        sizeof(opcode)
+    );
+
+    packet += msg;
 
     sendSSLPacketToServer(packet);
 }

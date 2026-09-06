@@ -23,6 +23,7 @@ enum eChatErr : uint8_t
     ERR_INVALID_ROOM,
     ERR_INVALID_ROOM_PASSWORD,
     ERR_INVALID_PACKET,
+    ERR_NO_ROOM_JOINED,
 };
 
 struct ChatRoom
