@@ -24,6 +24,7 @@ Communo project is a client and server applications for educational purposes. Bo
 * cmake >= 3.14
 * C++ compiler with C++17 support
 * OpenSSL >= 3.5.x
+* sqlite3 CLI
 
 # How to compile
 
