@@ -295,7 +295,7 @@ void Client::processReplyFromServerIfAny()
             case SMSG_MESSAGE:
                 std::cout << "\rReceived message "
                           << OPCODE_STR(SMSG_MESSAGE)
-                          << ": " << payload
+                          << ":\n" << payload
                           << '\n' << std::flush;
                 break;
 
@@ -502,4 +502,9 @@ void Client::sendGetCounter()
 void Client::sendGetChatRooms()
 {
     sendSSLOpcodeToServer(CMSG_GET_CHAT_ROOMS);
+}
+
+void Client::sendGetRoomInfo()
+{
+    sendSSLOpcodeToServer(CMSG_GET_ROOM_INFO);
 }

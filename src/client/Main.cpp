@@ -210,7 +210,7 @@ int main(int argc, char const* argv[])
     });
 
     cli.addCommand("chat info", [&client](const std::vector<std::string>&) {
-        std::cout << " chat info\n";
+        client.sendGetRoomInfo();
     });
 
     cli.addCommand("chat join", [&client](const std::vector<std::string>&) {

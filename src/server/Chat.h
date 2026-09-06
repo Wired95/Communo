@@ -13,8 +13,8 @@ enum eChatRooms : uint8_t
     ROOM_FUN        = 1,
     ROOM_PRIVATE    = 2,
 
-    MAX_CHAT_ROOMS,
-    ROOM_NONE,
+    MAX_CHAT_ROOMS  = ROOM_PRIVATE + 1,
+    ROOM_NONE       = MAX_CHAT_ROOMS + 1,
 };
 
 struct ChatRoom
@@ -25,7 +25,7 @@ struct ChatRoom
         id(_id), name(_name), password(_password) {}
     uint8_t id;
     std::string name;
-    std::string password;
+    std::string password; // todo : store hash in memory instead
 };
 
 class Chat
@@ -41,6 +41,11 @@ public:
     }
 
     std::string getChatRoomsStr() const;
+
+    std::string getRoomName(uint8_t roomID) const
+    {
+        return m_ChatRooms[roomID].name;
+    }
 
     bool checkRoomID(uint8_t roomID)
     {

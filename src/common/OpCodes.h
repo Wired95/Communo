@@ -38,7 +38,7 @@ enum eOpcodes : uint16_t
     CMSG_GET_COUNTER        = 0x0009,
 
     CMSG_GET_CHAT_ROOMS     = 0x000A,
-    CMSG_GET_ROOM_INFO      = 0x000B, // todo, if room id is provided, then display room info, otherwise send current room info
+    CMSG_GET_ROOM_INFO      = 0x000B,
     CMSG_JOIN_ROOM          = 0x000C, // todo
 
     // Server messages
@@ -53,6 +53,8 @@ enum eOpcodes : uint16_t
     SMSG_UPTIME             = 0x1006,
     SMSG_PONG               = 0x1007,
     SMSG_COUNTER            = 0x1008, // todo
+    SMSG_JOIN_CHAT_ROOM_OK  = 0x1009, // todo
+    SMSG_JOIN_CHAT_ROOM_ERR = 0x100A, // todo
 
     OPCODE_MAX              = (0x7FFF+1),
 };

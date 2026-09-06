@@ -152,11 +152,14 @@ bool ClientSocket::InitSSL(SSL_CTX* ctx, int timeoutSeconds)
 ClientSocket::ClientSocket(ClientSocket&& other) noexcept
     : socket(other.socket),
       ssl(other.ssl),
-      sslEnabled(other.sslEnabled)
+      sslEnabled(other.sslEnabled),
+      joinedChatRoomID(other.joinedChatRoomID)
 {
+    // belts and buckles
     other.socket = INVALID_SOCKET;
     other.ssl = nullptr;
     other.sslEnabled = false;
+    other.joinedChatRoomID = ROOM_NONE;
 }
 
 ClientSocket& ClientSocket::operator=(ClientSocket&& other) noexcept
@@ -176,10 +179,12 @@ ClientSocket& ClientSocket::operator=(ClientSocket&& other) noexcept
         socket = other.socket;
         ssl = other.ssl;
         sslEnabled = other.sslEnabled;
+        joinedChatRoomID = other.joinedChatRoomID;
 
         other.socket = INVALID_SOCKET;
         other.ssl = nullptr;
         other.sslEnabled = false;
+        other.joinedChatRoomID = ROOM_NONE;
     }
 
     return *this;
@@ -650,13 +655,17 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
             CallHandlerGetCounter(client);
             break;
         case CMSG_GET_CHAT_ROOMS:
-        {
             connLog << OPCODE_STR(CMSG_GET_CHAT_ROOMS);
             sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
             CallHandlerGetChatRooms(client);
             break;
-        }
+        case CMSG_GET_ROOM_INFO:
+            connLog << OPCODE_STR(CMSG_GET_ROOM_INFO);
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            CallHandlerGetRoominfo(client);
+            break;
         default:
             // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
             uint16_t CMSG_UNKNOWN_OPCODE = opcode;
@@ -789,4 +798,24 @@ void Server::CallHandlerGetCounter(ClientSocket* client)
 void Server::CallHandlerGetChatRooms(ClientSocket* client)
 {
     SendMsgToSocket(client, sChat.getChatRoomsStr());
+}
+
+void Server::CallHandlerGetRoominfo(ClientSocket* client)
+{
+    std::string msg;
+    uint8_t roomID = client->joinedChatRoomID;
+
+    std::cout << "client->joinedChatRoomID" << std::to_string(roomID) << std::endl;
+
+    if (roomID == ROOM_NONE)
+        msg += "No joined room";
+    else if (roomID >= MAX_CHAT_ROOMS)
+        msg += "Invalid room";
+    else
+    {
+        std::cout << std::to_string(roomID) << std::endl;
+        msg += "Joined: " + sChat.getRoomName(roomID);
+    }
+
+    SendMsgToSocket(client, msg);
 }

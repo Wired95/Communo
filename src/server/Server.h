@@ -50,7 +50,7 @@ struct ClientSocket
 
     int socket;
     SSL* ssl;
-    bool sslEnabled;
+    bool sslEnabled = false;
     uint8_t joinedChatRoomID;
 };
 
@@ -135,6 +135,7 @@ private:
     void CallHandlerUptime(ClientSocket* client);
     void CallHandlerGetCounter(ClientSocket* client);
     void CallHandlerGetChatRooms(ClientSocket* client);
+    void CallHandlerGetRoominfo(ClientSocket* client);
 };
 
 #endif // _SERVER_H_

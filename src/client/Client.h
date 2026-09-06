@@ -57,6 +57,7 @@ public:
     void sendIncrementCounter();
     void sendGetCounter();
     void sendGetChatRooms();
+    void sendGetRoomInfo();
 
 private:
     unsigned long long m_Sock;
