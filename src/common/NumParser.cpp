@@ -173,13 +173,14 @@ Number parse_integer_number(std::string_view input)
     if (!parse_integer(s, value, base))
         throw std::out_of_range("integer does not fit uint64_t");
 
-    if (value <= static_cast<uint64_t>(
-                     std::numeric_limits<int8_t>::max()))
-        return static_cast<int8_t>(value);
-
-    if (value <= static_cast<uint64_t>(
-                     std::numeric_limits<uint8_t>::max()))
+    if (value <= std::numeric_limits<uint8_t>::max())
         return static_cast<uint8_t>(value);
+
+    if (value <= std::numeric_limits<uint16_t>::max())
+        return static_cast<uint16_t>(value);
+
+    if (value <= std::numeric_limits<uint32_t>::max())
+        return static_cast<uint32_t>(value);
 
     if (value <= static_cast<uint64_t>(
                      std::numeric_limits<int16_t>::max()))
@@ -415,4 +416,17 @@ Number read_number(const char* buffer, size_t& offset, eNumberTypes type)
         default:
             throw std::runtime_error("Unknown number type");
     }
+}
+
+bool is_unsigned_integer(const Number& n)
+{
+    return std::visit([](auto value) {
+        using T = decltype(value);
+        return std::is_integral_v<T> && std::is_unsigned_v<T>;
+    }, n);
+}
+
+bool is_uint8_t(const Number& n)
+{
+    return std::holds_alternative<uint8_t>(n);
 }

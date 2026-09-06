@@ -90,6 +90,7 @@ if(${BuildType} STREQUAL "client" OR ${BuildType} STREQUAL "all")
     target_include_directories(Client PUBLIC 
         ${PROJECT_SOURCE_DIR}/src/common/
         ${PROJECT_SOURCE_DIR}/src/client/
+        ${PROJECT_SOURCE_DIR}/src/server/
     )
 
 endif()

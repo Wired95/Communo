@@ -17,6 +17,14 @@ enum eChatRooms : uint8_t
     ROOM_NONE       = MAX_CHAT_ROOMS + 1,
 };
 
+enum eChatErr : uint8_t
+{
+    ERR_OK,
+    ERR_INVALID_ROOM,
+    ERR_INVALID_ROOM_PASSWORD,
+    ERR_INVALID_PACKET,
+};
+
 struct ChatRoom
 {
     ChatRoom() : id(0) {}
@@ -35,6 +43,7 @@ public:
 
     void loadChatRooms()
     {
+        // todo: store them in CSV/DB
         m_ChatRooms[ROOM_GENERAL]   = { ROOM_GENERAL,   "General",  "" };
         m_ChatRooms[ROOM_FUN]       = { ROOM_FUN,       "Fun",      "" };
         m_ChatRooms[ROOM_PRIVATE]   = { ROOM_PRIVATE,   "Private",  "Password" };
@@ -52,11 +61,12 @@ public:
         return roomID >= ROOM_GENERAL && roomID < MAX_CHAT_ROOMS;
     }
 
-    bool checkPassword(uint8_t roomID, std::string pwd)
+    bool isRoomProtected(uint8_t roomID)
     {
-        return checkRoomID(roomID) && (
-            m_ChatRooms[roomID].password == "" || pwd == m_ChatRooms[roomID].password);
+        return !m_ChatRooms[roomID].password.empty();
     }
+
+    bool checkPasswordHash(uint8_t roomID, const unsigned char* hash);
 
 private:
     std::array<ChatRoom, MAX_CHAT_ROOMS> m_ChatRooms;

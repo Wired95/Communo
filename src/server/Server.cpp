@@ -9,6 +9,8 @@
 #include <cerrno>
 #include <utility>
 
+#include <openssl/sha.h>
+
 #include "Server.h"
 #include "DebugUtils.h"
 #include "OpCodes.h"
@@ -666,6 +668,22 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
 
             CallHandlerGetRoominfo(client);
             break;
+        case CMSG_JOIN_ROOM:
+        {
+            offset = sizeof(opcode);
+
+            size_t requiredSize = offset + sizeof(uint8_t) + SHA256_DIGEST_LENGTH;
+
+            if (payloadSize != requiredSize)
+                connLog << "Invalid opcode length, aborting handler call" << std::endl;
+            
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            if (requiredSize == payloadSize)
+                CallHandlerJoinRoom(client, offset, payloadSize);
+
+            break;
+        }
         default:
             // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
             uint16_t CMSG_UNKNOWN_OPCODE = opcode;
@@ -818,4 +836,44 @@ void Server::CallHandlerGetRoominfo(ClientSocket* client)
     }
 
     SendMsgToSocket(client, msg);
+}
+
+void Server::CallHandlerJoinRoom(ClientSocket* client, size_t offset, int payloadSize)
+{
+    std::string packet;
+    uint8_t error = ERR_OK;
+    uint8_t roomID = static_cast<uint8_t>(buffer[offset++]);
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+
+    std::memcpy(hash, buffer + offset, SHA256_DIGEST_LENGTH);
+
+    if (!sChat.checkRoomID(roomID))
+        error = ERR_INVALID_ROOM;
+
+    if (sChat.isRoomProtected(roomID))
+    {
+        if (!sChat.checkPasswordHash(roomID, hash))
+            error = ERR_INVALID_ROOM_PASSWORD;
+    }
+
+    if (error == ERR_OK)
+    {
+        client->joinedChatRoomID = roomID;
+
+        unsigned short int ropcode = htons(SMSG_JOIN_CHAT_ROOM_OK);
+        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+
+        packet.append(reinterpret_cast<const char*>(&roomID), sizeof(roomID));
+
+        SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_JOIN_CHAT_ROOM_OK));
+    }
+    else
+    {
+        unsigned short int ropcode = htons(SMSG_JOIN_CHAT_ROOM_ERR);
+        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+
+        packet.append(reinterpret_cast<const char*>(&error), sizeof(error));
+
+        SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_JOIN_CHAT_ROOM_ERR));
+    }
 }

@@ -136,6 +136,7 @@ private:
     void CallHandlerGetCounter(ClientSocket* client);
     void CallHandlerGetChatRooms(ClientSocket* client);
     void CallHandlerGetRoominfo(ClientSocket* client);
+    void CallHandlerJoinRoom(ClientSocket* client, size_t offset, int payloadSize);
 };
 
 #endif // _SERVER_H_

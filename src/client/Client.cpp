@@ -1,6 +1,7 @@
 #include "DebugUtils.h"
 #include "Client.h"
 #include "OpCodes.h"
+#include "Chat.h"
 
 #include <stdio.h> 
 #include <string>
@@ -14,6 +15,8 @@
 #include <unistd.h>
 #include <iomanip>
 #include <cstdlib>
+
+#include <openssl/sha.h>
 
 Client::~Client()
 {
@@ -351,8 +354,50 @@ void Client::processReplyFromServerIfAny()
                 std::memcpy(&value, payload.data(), sizeof(uint64_t));
                 std::cout << "\rReceived counter "
                           << OPCODE_STR(SMSG_COUNTER)
-                          << " -> " << value
+                          << " -> " << std::to_string(value)
                           << '\n' << std::flush;
+                break;
+            }
+            case SMSG_JOIN_CHAT_ROOM_OK:
+            {
+                uint8_t value;
+                std::memcpy(&value, payload.data(), sizeof(uint8_t));
+
+                std::cout << "\rRoom joined "
+                          << OPCODE_STR(SMSG_JOIN_CHAT_ROOM_OK)
+                          << " -> ID: " << std::to_string(value)
+                          << '\n' << std::flush;
+
+                break;
+            }
+            case SMSG_JOIN_CHAT_ROOM_ERR:
+            {
+                uint8_t value;
+                std::memcpy(&value, payload.data(), sizeof(uint8_t));
+
+                std::string errorMessage = "";
+                switch (value) {
+                    case ERR_INVALID_ROOM:
+                        errorMessage = "Invalid room ID.";
+                        break;
+                    case ERR_INVALID_ROOM_PASSWORD:
+                        errorMessage = "Invalid room password.";
+                        break;
+                    case ERR_INVALID_PACKET:
+                        errorMessage = "Invalid join request.";
+                        break;
+                    case ERR_OK:
+                    default:
+                        errorMessage = "Something went wrong.";
+                        break;
+                }
+
+                std::cout << "\rRoom not joined "
+                          << OPCODE_STR(SMSG_JOIN_CHAT_ROOM_ERR)
+                          << " -> err: " << std::to_string(value)
+                          << "\n" << errorMessage
+                          << '\n' << std::flush;
+
                 break;
             }
             default:
@@ -507,4 +552,29 @@ void Client::sendGetChatRooms()
 void Client::sendGetRoomInfo()
 {
     sendSSLOpcodeToServer(CMSG_GET_ROOM_INFO);
+}
+
+void Client::sendJoinRoomRequest(uint8_t roomID, std::string password)
+{
+    std::cout << "Request Joining: " << std::to_string(roomID) << std::endl;
+
+    std::string packet;
+
+    uint16_t opcode = htons(CMSG_JOIN_ROOM);
+    packet.append(
+        reinterpret_cast<const char*>(&opcode),
+        sizeof(opcode)
+    );
+
+    packet.push_back(static_cast<char>(roomID));
+
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256(reinterpret_cast<const unsigned char*>(password.data()), password.size(), hash);
+
+    packet.append(
+        reinterpret_cast<const char*>(&hash),
+        sizeof(hash)
+    );
+
+    sendSSLPacketToServer(packet);
 }

@@ -1,6 +1,9 @@
 #include "Chat.h"
 
 #include <iostream>
+#include <cstring>
+
+#include <openssl/sha.h>
 
 std::string Chat::getChatRoomsStr() const
 {
@@ -19,4 +22,20 @@ std::string Chat::getChatRoomsStr() const
             rooms += '\n';
     }
     return rooms;
+}
+
+bool Chat::checkPasswordHash(uint8_t roomID, const unsigned char* hash)
+{
+    bool valid = false;
+
+    // Get room password
+    unsigned char roomHash[SHA256_DIGEST_LENGTH];
+    const std::string& password = m_ChatRooms[roomID].password;
+    SHA256(reinterpret_cast<const unsigned char*>(password.data()), password.size(), roomHash);
+    
+    // Compare hash
+    if (std::memcmp(roomHash, hash, SHA256_DIGEST_LENGTH) == 0)
+        valid = true;
+
+    return valid;
 }

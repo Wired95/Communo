@@ -201,7 +201,7 @@ int main(int argc, char const* argv[])
             << "Available commands for chat:\n"
             << "  get-rooms\n"
             << "  info\n"
-            << "  join\n"
+            << "  join <room ID> <opt: password>\n"
             << "  say\n";
     });
 
@@ -213,8 +213,30 @@ int main(int argc, char const* argv[])
         client.sendGetRoomInfo();
     });
 
-    cli.addCommand("chat join", [&client](const std::vector<std::string>&) {
-        std::cout << " chat join\n";
+    cli.addCommand("chat join", [&client](const std::vector<std::string>& args) {
+        if (args.size() != 1 && args.size() != 2)
+            throw std::runtime_error("usage: chat join <room ID> <opt: password>");
+
+        Number num;
+        bool validNumbers = true;
+        try
+        {
+            num = parse_number(args[0]);
+        }
+        catch (const std::exception& e)
+        {
+            validNumbers = false;
+            std::cout << "invalid room number: " << e.what() << '\n';
+        }
+
+        std::string pwd = "";
+        if (args.size() == 2)
+            pwd = args[1];
+
+        if (validNumbers && is_unsigned_integer(num) && is_uint8_t(num))
+            client.sendJoinRoomRequest(std::get<uint8_t>(num), pwd);
+        else
+            std::cout << "invalid room number: " << args[0] << std::endl;
     });
 
     cli.addCommand("chat say", [&client](const std::vector<std::string>&) {
