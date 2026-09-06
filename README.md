@@ -62,8 +62,14 @@ Available commands:
   add <a> <b> ...
   ping
   uptime
-  increment-counter
-  get-counter
+  counter ..
+    increment
+    get
+  chat ..
+    get-rooms
+    info
+    join <room ID> <opt: password>
+    say
   help
   exit
 ```

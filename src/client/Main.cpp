@@ -181,13 +181,21 @@ int main(int argc, char const* argv[])
         client.sendUptime();
     });
 
-    // increment-counter
-    cli.addCommand("increment-counter", [&client](const std::vector<std::string>&) {
+    // counter
+    cli.addCommand("counter", [&client](const std::vector<std::string>&) {
+        std::cout
+            << "Available commands for counter:\n"
+            << "  increment\n"
+            << "  get\n";
+    });
+
+    // counter increment
+    cli.addCommand("counter increment", [&client](const std::vector<std::string>&) {
         client.sendIncrementCounter();
     });
 
-    // get-counter
-    cli.addCommand("get-counter", [&client](const std::vector<std::string>&) {
+    // counter get
+    cli.addCommand("counter get", [&client](const std::vector<std::string>&) {
         client.sendGetCounter();
     });
 
@@ -252,8 +260,7 @@ int main(int argc, char const* argv[])
             << "  add <a> <b> ...\n"
             << "  ping\n"
             << "  uptime\n"
-            << "  increment-counter\n"
-            << "  get-counter\n"
+            << "  counter ..\n"
             << "  chat ..\n"
             << "  help\n"
             << "  exit\n";
