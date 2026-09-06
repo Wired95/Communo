@@ -2,13 +2,11 @@
 #define _CHAT_H_
 
 #include "Singleton.h"
-#include "Database.h"
 #include "SharedDefinitions.h"
 
 #include <string>
 #include <unordered_map>
 #include <cstdint>
-
 
 
 struct ChatRoom
@@ -26,13 +24,7 @@ class Chat
 public:
     Chat() {}
 
-    void loadChatRooms()
-    {
-        // todo: store them in CSV/DB
-        m_ChatRooms[0]   = { "General",  "" };
-        m_ChatRooms[1]   = { "Fun",      "" };
-        m_ChatRooms[2]   = { "Private",  "Password" };
-    }
+    void loadChatRooms();
 
     std::string getChatRoomsStr() const;
 

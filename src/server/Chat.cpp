@@ -1,9 +1,15 @@
 #include "Chat.h"
+#include "Database.h"
 
 #include <iostream>
 #include <cstring>
 
 #include <openssl/sha.h>
+
+void Chat::loadChatRooms()
+{
+    sDatabase.loadRooms(m_ChatRooms);
+}
 
 std::string Chat::getChatRoomsStr() const
 {
