@@ -2,39 +2,23 @@
 #define _CHAT_H_
 
 #include "Singleton.h"
+#include "Database.h"
+#include "SharedDefinitions.h"
+
 #include <string>
-#include <array>
+#include <unordered_map>
 #include <cstdint>
 
 
-enum eChatRooms : uint8_t
-{
-    ROOM_GENERAL    = 0,
-    ROOM_FUN        = 1,
-    ROOM_PRIVATE    = 2,
-
-    MAX_CHAT_ROOMS  = ROOM_PRIVATE + 1,
-    ROOM_NONE       = MAX_CHAT_ROOMS + 1,
-};
-
-enum eChatErr : uint8_t
-{
-    ERR_OK,
-    ERR_INVALID_ROOM,
-    ERR_INVALID_ROOM_PASSWORD,
-    ERR_INVALID_PACKET,
-    ERR_NO_ROOM_JOINED,
-};
 
 struct ChatRoom
 {
-    ChatRoom() : id(0) {}
+    ChatRoom() {}
 
-    ChatRoom(uint8_t _id, std::string _name, std::string _password) :
-        id(_id), name(_name), password(_password) {}
-    uint8_t id;
+    ChatRoom(std::string _name, std::string _passwordHash) :
+        name(_name), passwordHash(_passwordHash) {}
     std::string name;
-    std::string password; // todo : store hash in memory instead
+    std::string passwordHash; // todo : store hash in memory instead
 };
 
 class Chat
@@ -45,32 +29,32 @@ public:
     void loadChatRooms()
     {
         // todo: store them in CSV/DB
-        m_ChatRooms[ROOM_GENERAL]   = { ROOM_GENERAL,   "General",  "" };
-        m_ChatRooms[ROOM_FUN]       = { ROOM_FUN,       "Fun",      "" };
-        m_ChatRooms[ROOM_PRIVATE]   = { ROOM_PRIVATE,   "Private",  "Password" };
+        m_ChatRooms[0]   = { "General",  "" };
+        m_ChatRooms[1]   = { "Fun",      "" };
+        m_ChatRooms[2]   = { "Private",  "Password" };
     }
 
     std::string getChatRoomsStr() const;
 
     std::string getRoomName(uint8_t roomID) const
     {
-        return m_ChatRooms[roomID].name;
+        return m_ChatRooms.at(roomID).name;
     }
 
     bool checkRoomID(uint8_t roomID)
     {
-        return roomID >= ROOM_GENERAL && roomID < MAX_CHAT_ROOMS;
+        return m_ChatRooms.find(roomID) != m_ChatRooms.end();
     }
 
     bool isRoomProtected(uint8_t roomID)
     {
-        return !m_ChatRooms[roomID].password.empty();
+        return !m_ChatRooms[roomID].passwordHash.empty();
     }
 
     bool checkPasswordHash(uint8_t roomID, const unsigned char* hash);
 
 private:
-    std::array<ChatRoom, MAX_CHAT_ROOMS> m_ChatRooms;
+    std::unordered_map<uint8_t, ChatRoom> m_ChatRooms;
 };
 
 // Define Chat singleton

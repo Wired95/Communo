@@ -5,6 +5,7 @@
  * 1. Network configuration
  * 2. Server daemon settings
  * 3. SSL Settings
+ * 4. Chat settings
  */
 
 /// 1. Network configuration
@@ -22,5 +23,18 @@
 inline constexpr const char* tls_ca_file   = TLS_CA_FILE;
 inline constexpr const char* tls_key_file  = TLS_KEY_FILE;
 inline constexpr const char* tls_cert_file = TLS_CERT_FILE;
+
+/// 4. Chat settings
+
+#include <cstdint> // for uint8_t
+
+enum eChatErr : uint8_t
+{
+    ERR_OK,
+    ERR_INVALID_ROOM,
+    ERR_INVALID_ROOM_PASSWORD,
+    ERR_INVALID_PACKET,
+    ERR_NO_ROOM_JOINED,
+};
 
 #endif // _SHAREDDEFS_H_

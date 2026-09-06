@@ -24,8 +24,8 @@ enum class eServerState
 
 struct ClientSocket
 {
-    ClientSocket() : socket(0), sslEnabled(false), joinedChatRoomID(ROOM_NONE) {}
-    ClientSocket(int _socket) : socket(_socket), sslEnabled(false), joinedChatRoomID(ROOM_NONE) {}
+    ClientSocket() : socket(0), sslEnabled(false), chatRoomJoined(false), joinedChatRoomID(0) {}
+    ClientSocket(int _socket) : socket(_socket), sslEnabled(false), chatRoomJoined(false), joinedChatRoomID(0) {}
 
     ClientSocket(const ClientSocket&) = delete;
     ClientSocket& operator=(const ClientSocket&) = delete;
@@ -51,6 +51,8 @@ struct ClientSocket
     int socket;
     SSL* ssl;
     bool sslEnabled = false;
+
+    bool chatRoomJoined = false;
     uint8_t joinedChatRoomID;
 };
 

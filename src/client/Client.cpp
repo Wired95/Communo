@@ -1,7 +1,7 @@
 #include "DebugUtils.h"
 #include "Client.h"
 #include "OpCodes.h"
-#include "Chat.h"
+#include "SharedDefinitions.h"
 
 #include <stdio.h> 
 #include <string>

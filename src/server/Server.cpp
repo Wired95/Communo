@@ -155,13 +155,15 @@ ClientSocket::ClientSocket(ClientSocket&& other) noexcept
     : socket(other.socket),
       ssl(other.ssl),
       sslEnabled(other.sslEnabled),
+      chatRoomJoined(other.chatRoomJoined),
       joinedChatRoomID(other.joinedChatRoomID)
 {
     // belts and buckles
     other.socket = INVALID_SOCKET;
     other.ssl = nullptr;
     other.sslEnabled = false;
-    other.joinedChatRoomID = ROOM_NONE;
+    other.chatRoomJoined = false;
+    other.joinedChatRoomID = 0;
 }
 
 ClientSocket& ClientSocket::operator=(ClientSocket&& other) noexcept
@@ -181,12 +183,14 @@ ClientSocket& ClientSocket::operator=(ClientSocket&& other) noexcept
         socket = other.socket;
         ssl = other.ssl;
         sslEnabled = other.sslEnabled;
+        chatRoomJoined = other.chatRoomJoined;
         joinedChatRoomID = other.joinedChatRoomID;
 
         other.socket = INVALID_SOCKET;
         other.ssl = nullptr;
         other.sslEnabled = false;
-        other.joinedChatRoomID = ROOM_NONE;
+        other.chatRoomJoined = false;
+        other.joinedChatRoomID = 0;
     }
 
     return *this;
@@ -837,9 +841,9 @@ void Server::CallHandlerGetRoominfo(ClientSocket* client)
 
     std::cout << "client->joinedChatRoomID" << std::to_string(roomID) << std::endl;
 
-    if (roomID == ROOM_NONE)
+    if (client->chatRoomJoined == false)
         msg += "No joined room";
-    else if (roomID >= MAX_CHAT_ROOMS)
+    else if (!sChat.checkRoomID(roomID))
         msg += "Invalid room";
     else
     {
@@ -871,6 +875,7 @@ void Server::CallHandlerJoinRoom(ClientSocket* client, size_t offset, int payloa
     if (error == ERR_OK)
     {
         client->joinedChatRoomID = roomID;
+        client->chatRoomJoined = true;
 
         unsigned short int ropcode = htons(SMSG_JOIN_CHAT_ROOM_OK);
         packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
@@ -896,7 +901,7 @@ void Server::CallHandlerSay(ClientSocket* client, std::string message)
     uint8_t roomID = client->joinedChatRoomID;
     unsigned short int ropcode;
 
-    if (sChat.checkRoomID(roomID))
+    if (sChat.checkRoomID(roomID) && client->chatRoomJoined)
     {
         // the room is valid, send that everything is OK
         ropcode = htons(SMSG_SAY_OK);
@@ -915,7 +920,7 @@ void Server::CallHandlerSay(ClientSocket* client, std::string message)
             if (!_client.sslEnabled)
                 continue;
 
-            if (_client.joinedChatRoomID != roomID)
+            if (_client.joinedChatRoomID != roomID || !_client.chatRoomJoined)
                 continue;
 
             SendSSLPacketToClientSocket(&_client, packet, OPCODE_OSTR(SMSG_BROADCAST));
@@ -925,7 +930,7 @@ void Server::CallHandlerSay(ClientSocket* client, std::string message)
     {
         // the room is not valid, send error message
         uint8_t error = ERR_INVALID_ROOM;
-        if (roomID == ROOM_NONE)
+        if (!client->chatRoomJoined)
             error = ERR_NO_ROOM_JOINED;
 
         ropcode = htons(SMSG_SAY_ERR);
