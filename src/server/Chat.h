@@ -1,0 +1,80 @@
+#ifndef _CHAT_H_
+#define _CHAT_H_
+
+#include "Singleton.h"
+#include <string>
+#include <array>
+#include <cstdint>
+
+
+enum eChatRooms : uint8_t
+{
+    ROOM_GENERAL    = 0,
+    ROOM_FUN        = 1,
+    ROOM_PRIVATE    = 2,
+
+    MAX_CHAT_ROOMS  = ROOM_PRIVATE + 1,
+    ROOM_NONE       = MAX_CHAT_ROOMS + 1,
+};
+
+enum eChatErr : uint8_t
+{
+    ERR_OK,
+    ERR_INVALID_ROOM,
+    ERR_INVALID_ROOM_PASSWORD,
+    ERR_INVALID_PACKET,
+    ERR_NO_ROOM_JOINED,
+};
+
+struct ChatRoom
+{
+    ChatRoom() : id(0) {}
+
+    ChatRoom(uint8_t _id, std::string _name, std::string _password) :
+        id(_id), name(_name), password(_password) {}
+    uint8_t id;
+    std::string name;
+    std::string password; // todo : store hash in memory instead
+};
+
+class Chat
+{
+public:
+    Chat() {}
+
+    void loadChatRooms()
+    {
+        // todo: store them in CSV/DB
+        m_ChatRooms[ROOM_GENERAL]   = { ROOM_GENERAL,   "General",  "" };
+        m_ChatRooms[ROOM_FUN]       = { ROOM_FUN,       "Fun",      "" };
+        m_ChatRooms[ROOM_PRIVATE]   = { ROOM_PRIVATE,   "Private",  "Password" };
+    }
+
+    std::string getChatRoomsStr() const;
+
+    std::string getRoomName(uint8_t roomID) const
+    {
+        return m_ChatRooms[roomID].name;
+    }
+
+    bool checkRoomID(uint8_t roomID)
+    {
+        return roomID >= ROOM_GENERAL && roomID < MAX_CHAT_ROOMS;
+    }
+
+    bool isRoomProtected(uint8_t roomID)
+    {
+        return !m_ChatRooms[roomID].password.empty();
+    }
+
+    bool checkPasswordHash(uint8_t roomID, const unsigned char* hash);
+
+private:
+    std::array<ChatRoom, MAX_CHAT_ROOMS> m_ChatRooms;
+};
+
+// Define Chat singleton
+static Singleton2<Chat> __Chat;
+#define sChat           __Chat.getInstance()
+
+#endif // _CHAT_H_

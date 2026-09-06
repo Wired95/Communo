@@ -48,6 +48,7 @@ public:
     void processReplyFromServerIfAny();
 
     void sendSSLPacketToServer(const std::string& packet);
+    void sendSSLOpcodeToServer(const uint16_t opcode);
     void sendEchoRequest(std::string msg);
     void sendAdditionRequest(const std::vector<Number> numbers);
     void sendBroadcast(std::string const msg);
@@ -55,6 +56,10 @@ public:
     void sendUptime();
     void sendIncrementCounter();
     void sendGetCounter();
+    void sendGetChatRooms();
+    void sendGetRoomInfo();
+    void sendJoinRoomRequest(uint8_t roomID, std::string password);
+    void sendChatSay(std::string const msg);
 
 private:
     unsigned long long m_Sock;

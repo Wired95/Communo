@@ -45,21 +45,42 @@ public:
             if (args.empty())
                 continue;
 
-            const std::string command = args[0];
-            args.erase(args.begin());
-
-            if (command == "exit" || command == "quit")
+            if (args[0] == "exit" || args[0] == "quit")
                 break;
 
-            auto it = commands.find(command);
+            // Find the longest matching command.
+            std::string command;
+            std::vector<std::string> commandArgs;
 
-            if (it == commands.end()) {
-                std::cout << "Unknown command: " << command << '\n';
+            for (size_t i = 0; i < args.size(); ++i) {
+                std::string candidate;
+
+                for (size_t j = 0; j <= i; ++j) {
+                    if (j > 0)
+                        candidate += ' ';
+
+                    candidate += args[j];
+                }
+
+                auto it = commands.find(candidate);
+
+                if (it != commands.end()) {
+                    command = candidate;
+
+                    commandArgs.assign(
+                        args.begin() + i + 1,
+                        args.end()
+                    );
+                }
+            }
+
+            if (command.empty()) {
+                std::cout << "Unknown command: " << args[0] << '\n';
                 continue;
             }
 
             try {
-                it->second(args);
+                commands.at(command)(commandArgs);
             } catch (const std::exception& e) {
                 std::cout << "Error: " << e.what() << '\n';
             }
@@ -160,24 +181,80 @@ int main(int argc, char const* argv[])
         client.sendUptime();
     });
 
-    // increment-counter
-    cli.addCommand("increment-counter", [&client](const std::vector<std::string>&) {
+    // counter
+    cli.addCommand("counter", [&client](const std::vector<std::string>&) {
+        std::cout
+            << "Available commands for counter:\n"
+            << "  increment\n"
+            << "  get\n";
+    });
+
+    // counter increment
+    cli.addCommand("counter increment", [&client](const std::vector<std::string>&) {
         client.sendIncrementCounter();
     });
 
-    // get-counter
-    cli.addCommand("get-counter", [&client](const std::vector<std::string>&) {
+    // counter get
+    cli.addCommand("counter get", [&client](const std::vector<std::string>&) {
         client.sendGetCounter();
     });
 
     /* todo:
     CMSG_GET_CLIENT_LIST    = 0x0004, // todo
     CMSG_SEND_MSG_TO_CLIENT = 0x0005, // todo
-    CMSG_INCREMENT_COUNTER  = 0x0008, // todo
-    CMSG_GET_COUNTER        = 0x0009, // todo
-    
-    
     */
+
+    cli.addCommand("chat", [&client](const std::vector<std::string>&) {
+        std::cout
+            << "Available commands for chat:\n"
+            << "  get-rooms\n"
+            << "  info\n"
+            << "  join <room ID> <opt: password>\n"
+            << "  say\n";
+    });
+
+    cli.addCommand("chat get-rooms", [&client](const std::vector<std::string>&) {
+        client.sendGetChatRooms();
+    });
+
+    cli.addCommand("chat info", [&client](const std::vector<std::string>&) {
+        client.sendGetRoomInfo();
+    });
+
+    cli.addCommand("chat join", [&client](const std::vector<std::string>& args) {
+        if (args.size() != 1 && args.size() != 2)
+            throw std::runtime_error("usage: chat join <room ID> <opt: password>");
+
+        Number num;
+        bool validNumbers = true;
+        try
+        {
+            num = parse_number(args[0]);
+        }
+        catch (const std::exception& e)
+        {
+            validNumbers = false;
+            std::cout << "invalid room number: " << e.what() << '\n';
+        }
+
+        std::string pwd = "";
+        if (args.size() == 2)
+            pwd = args[1];
+
+        if (validNumbers && is_unsigned_integer(num) && is_uint8_t(num))
+            client.sendJoinRoomRequest(std::get<uint8_t>(num), pwd);
+        else
+            std::cout << "invalid room number: " << args[0] << std::endl;
+    });
+
+    cli.addCommand("chat say", [&client](const std::vector<std::string>& args) {
+        std::string msg;
+
+        for (const std::string& arg : args)
+            msg += arg + ' ';
+
+        client.sendChatSay(msg);
+    });
 
     // help
     cli.addCommand("help", [](const std::vector<std::string>&) {
@@ -188,8 +265,8 @@ int main(int argc, char const* argv[])
             << "  add <a> <b> ...\n"
             << "  ping\n"
             << "  uptime\n"
-            << "  increment-counter\n"
-            << "  get-counter\n"
+            << "  counter ..\n"
+            << "  chat ..\n"
             << "  help\n"
             << "  exit\n";
     });

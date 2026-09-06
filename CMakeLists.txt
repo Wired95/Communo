@@ -46,6 +46,8 @@ add_library(Common STATIC
 # Server scripts
 if(${BuildType} STREQUAL "server" OR ${BuildType} STREQUAL "all")
     add_executable (Server 
+        src/server/Chat.cpp
+        src/server/Chat.h
         src/server/Main.cpp
         src/server/Server.cpp
         src/server/Server.h
@@ -88,6 +90,7 @@ if(${BuildType} STREQUAL "client" OR ${BuildType} STREQUAL "all")
     target_include_directories(Client PUBLIC 
         ${PROJECT_SOURCE_DIR}/src/common/
         ${PROJECT_SOURCE_DIR}/src/client/
+        ${PROJECT_SOURCE_DIR}/src/server/
     )
 
 endif()

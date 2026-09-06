@@ -11,6 +11,13 @@ Communo project is a client and server applications for educational purposes. Bo
 * Linux support for the server
 * Windows and Linux support for the client
 * Localhost binding for the client and server
+* Client-server features, such as:
+  * ping/pong
+  * uptime
+  * chat system
+  * simple counter increment/get
+  * message broadcast
+  * simple math operations on multiple numbers
 
 # Requirements
 
@@ -62,8 +69,14 @@ Available commands:
   add <a> <b> ...
   ping
   uptime
-  increment-counter
-  get-counter
+  counter ..
+    increment
+    get
+  chat ..
+    get-rooms
+    info
+    join <room ID> <opt: password>
+    say
   help
   exit
 ```

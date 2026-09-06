@@ -72,4 +72,7 @@ void append_number(std::string& replyStr, const Number& number);
 // Read a buffer from an offset given an appropriate type, and cast its value accordingly
 Number read_number(const char* buffer, size_t& offset, eNumberTypes type);
 
+bool is_unsigned_integer(const Number& n);
+bool is_uint8_t(const Number& n);
+
 #endif // _NUM_PARSER_H_

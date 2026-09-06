@@ -8,13 +8,13 @@
               << static_cast<uint16_t>(x) \
               << ")]"
 
-#define OPCODE_OSTR(x)                      \
-    ([&] {                                  \
-        std::ostringstream ss;              \
-        ss << "[" << #x << " (0x"           \
-           << std::uppercase << std::hex    \
-           << static_cast<int>(x) << ")";   \
-        return ss.str();                    \
+#define OPCODE_OSTR(x)                          \
+    ([&] {                                      \
+        std::ostringstream ss;                  \
+        ss << "[" << #x << " (0x"               \
+           << std::uppercase << std::hex        \
+           << static_cast<uint16_t>(x) << ")";  \
+        return ss.str();                        \
     }())
 
 enum eOpcodes : uint16_t
@@ -23,14 +23,24 @@ enum eOpcodes : uint16_t
 
     // Client messages
     CMSG_ECHO_REQUEST       = 0x0001,
+
     CMSG_ADDITION_REQUEST   = 0x0002,
+
     CMSG_BROADCAST_MESSAGE  = 0x0003,
+
     CMSG_GET_CLIENT_LIST    = 0x0004, // todo
     CMSG_SEND_MSG_TO_CLIENT = 0x0005, // todo
+
     CMSG_UPTIME             = 0x0006,
     CMSG_PING               = 0x0007,
-    CMSG_INCREMENT_COUNTER  = 0x0008, // todo
-    CMSG_GET_COUNTER        = 0x0009, // todo
+
+    CMSG_INCREMENT_COUNTER  = 0x0008,
+    CMSG_GET_COUNTER        = 0x0009,
+
+    CMSG_GET_CHAT_ROOMS     = 0x000A,
+    CMSG_GET_ROOM_INFO      = 0x000B,
+    CMSG_JOIN_ROOM          = 0x000C,
+    CMSG_SAY                = 0x000D,
 
     // Server messages
     SMSG_MOTD               = 0x0FFF,
@@ -43,7 +53,12 @@ enum eOpcodes : uint16_t
     SMSG_PRIVATE_MESSAGE    = 0x1005, // todo
     SMSG_UPTIME             = 0x1006,
     SMSG_PONG               = 0x1007,
-    SMSG_COUNTER            = 0x1008, // todo
+    SMSG_COUNTER            = 0x1008,
+    SMSG_JOIN_CHAT_ROOM_OK  = 0x1009,
+    SMSG_JOIN_CHAT_ROOM_ERR = 0x100A,
+    SMSG_SAY_OK             = 0x100B,
+    SMSG_SAY_ERR            = 0x100C,
+    SMSG_SAY                = 0x100D,
 
     OPCODE_MAX              = (0x7FFF+1),
 };
