@@ -3,15 +3,15 @@
 
 #include "Chat.h"
 
-#include <stdexcept>
 #include <sqlite3.h>
+#include <stdexcept>
 
 // Given by CMake
-inline constexpr const char* sqlite_db_file = SQLITE_DB_FILE;
+inline constexpr const char *sqlite_db_file = SQLITE_DB_FILE;
 
 class Database
 {
-public:
+  public:
     Database()
     {
         if (sqlite3_open(sqlite_db_file, &m_db) != SQLITE_OK)
@@ -32,17 +32,17 @@ public:
             sqlite3_close(m_db);
     }
 
-    Database(const Database&) = delete;
-    Database& operator=(const Database&) = delete;
+    Database(const Database &) = delete;
+    Database &operator=(const Database &) = delete;
 
-    void loadRooms(std::unordered_map<uint8_t, ChatRoom>& chatRooms);
+    void loadRooms(std::unordered_map<uint8_t, ChatRoom> &chatRooms);
 
-private:
-    sqlite3* m_db = nullptr;
+  private:
+    sqlite3 *m_db = nullptr;
 };
 
 // Define Database singleton
 static Singleton2<Database> __Database;
-#define sDatabase           __Database.getInstance()
+#define sDatabase __Database.getInstance()
 
 #endif // _DATABASE_H_

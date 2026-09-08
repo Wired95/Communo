@@ -1,22 +1,22 @@
+#include <cerrno>
+#include <chrono>
+#include <cstring>
+#include <fcntl.h>
+#include <iomanip>
 #include <iostream>
+#include <poll.h>
 #include <sstream>
 #include <string>
-#include <cstring>
-#include <iomanip>
-#include <chrono>
-#include <poll.h>
-#include <fcntl.h>
-#include <cerrno>
 #include <utility>
 
 #include <openssl/sha.h>
 
-#include "Server.h"
-#include "DebugUtils.h"
-#include "OpCodes.h"
-#include "NumParser.h"
-#include "Universe.h"
 #include "Chat.h"
+#include "DebugUtils.h"
+#include "NumParser.h"
+#include "OpCodes.h"
+#include "Server.h"
+#include "Universe.h"
 
 #ifdef _WIN32
 
@@ -27,9 +27,9 @@
 
 #else
 
-#include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #define SOCKET int
@@ -42,7 +42,7 @@
 
 #endif
 
-bool ClientSocket::InitSSL(SSL_CTX* ctx, int timeoutSeconds)
+bool ClientSocket::InitSSL(SSL_CTX *ctx, int timeoutSeconds)
 {
     ssl = SSL_new(ctx);
 
@@ -63,8 +63,7 @@ bool ClientSocket::InitSSL(SSL_CTX* ctx, int timeoutSeconds)
     }
 
     const auto deadline =
-        std::chrono::steady_clock::now() +
-        std::chrono::seconds(timeoutSeconds);
+        std::chrono::steady_clock::now() + std::chrono::seconds(timeoutSeconds);
 
     while (true)
     {
@@ -78,8 +77,7 @@ bool ClientSocket::InitSSL(SSL_CTX* ctx, int timeoutSeconds)
 
         int error = SSL_get_error(ssl, ret);
 
-        if (error != SSL_ERROR_WANT_READ &&
-            error != SSL_ERROR_WANT_WRITE)
+        if (error != SSL_ERROR_WANT_READ && error != SSL_ERROR_WANT_WRITE)
         {
             ERR_print_errors_fp(stderr);
             SSL_free(ssl);
@@ -92,8 +90,7 @@ bool ClientSocket::InitSSL(SSL_CTX* ctx, int timeoutSeconds)
 
         if (now >= deadline)
         {
-            sLog.log(LOG_FLAG_DEBUG,
-                     "SSL handshake timed out.");
+            sLog.log(LOG_FLAG_DEBUG, "SSL handshake timed out.");
 
             SSL_free(ssl);
             ssl = nullptr;
@@ -101,23 +98,19 @@ bool ClientSocket::InitSSL(SSL_CTX* ctx, int timeoutSeconds)
             return false;
         }
 
-        auto remaining =
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                deadline - now).count();
+        auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+                             deadline - now)
+                             .count();
 
         struct pollfd pfd{};
         pfd.fd = socket;
-        pfd.events =
-            (error == SSL_ERROR_WANT_READ)
-                ? POLLIN
-                : POLLOUT;
+        pfd.events = (error == SSL_ERROR_WANT_READ) ? POLLIN : POLLOUT;
 
         int result = poll(&pfd, 1, static_cast<int>(remaining));
 
         if (result == 0)
         {
-            sLog.log(LOG_FLAG_DEBUG,
-                     "SSL handshake timed out.");
+            sLog.log(LOG_FLAG_DEBUG, "SSL handshake timed out.");
 
             SSL_free(ssl);
             ssl = nullptr;
@@ -140,8 +133,7 @@ bool ClientSocket::InitSSL(SSL_CTX* ctx, int timeoutSeconds)
 
         if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))
         {
-            sLog.log(LOG_FLAG_DEBUG,
-                     "Socket error during SSL handshake.");
+            sLog.log(LOG_FLAG_DEBUG, "Socket error during SSL handshake.");
 
             SSL_free(ssl);
             ssl = nullptr;
@@ -151,13 +143,10 @@ bool ClientSocket::InitSSL(SSL_CTX* ctx, int timeoutSeconds)
     }
 }
 
-ClientSocket::ClientSocket(ClientSocket&& other) noexcept
-    : socket(other.socket),
-      ssl(other.ssl),
-      sslEnabled(other.sslEnabled),
+ClientSocket::ClientSocket(ClientSocket &&other) noexcept
+    : socket(other.socket), ssl(other.ssl), sslEnabled(other.sslEnabled),
       chatRoomJoined(other.chatRoomJoined),
-      joinedChatRoomID(other.joinedChatRoomID),
-      clientID(other.clientID),
+      joinedChatRoomID(other.joinedChatRoomID), clientID(other.clientID),
       clientUsername(other.clientUsername)
 {
     // belts and buckles
@@ -170,7 +159,7 @@ ClientSocket::ClientSocket(ClientSocket&& other) noexcept
     other.clientUsername = "<unk>";
 }
 
-ClientSocket& ClientSocket::operator=(ClientSocket&& other) noexcept
+ClientSocket &ClientSocket::operator=(ClientSocket &&other) noexcept
 {
     if (this != &other)
     {
@@ -212,7 +201,7 @@ Server::Server()
 
     m_SendHelloMsg = false;
 
-    //type of socket created  
+    // type of socket created
     m_Adress.sin_family = AF_INET;
     m_Adress.sin_addr.s_addr = INADDR_ANY;
     m_Adress.sin_port = htons(PORT);
@@ -237,17 +226,21 @@ void Server::InitSSL()
     // Create a server-side TLS context.
     m_ctx = SSL_CTX_new(TLS_server_method());
 
-    if (m_ctx == nullptr) {
+    if (m_ctx == nullptr)
+    {
         ERR_print_errors_fp(stderr);
-        throw CommunoException(CommunoException::err_ssl_ctx, false, "TLS context creation failed");
+        throw CommunoException(CommunoException::err_ssl_ctx, false,
+                               "TLS context creation failed");
         return;
     }
 
     // Require TLS 1.3.
-    if (SSL_CTX_set_min_proto_version(m_ctx, TLS1_3_VERSION) != 1) {
+    if (SSL_CTX_set_min_proto_version(m_ctx, TLS1_3_VERSION) != 1)
+    {
         ERR_print_errors_fp(stderr);
         SSL_CTX_free(m_ctx);
-        throw CommunoException(CommunoException::err_tls, false, "TLS 1.3 context creation failed");
+        throw CommunoException(CommunoException::err_tls, false,
+                               "TLS 1.3 context creation failed");
         return;
     }
 
@@ -255,30 +248,33 @@ void Server::InitSSL()
     //
     // The certificate file should contain the server certificate and,
     // if necessary, the intermediate certificate chain.
-    if (SSL_CTX_use_certificate_chain_file(m_ctx, tls_cert_file) != 1) {
+    if (SSL_CTX_use_certificate_chain_file(m_ctx, tls_cert_file) != 1)
+    {
         ERR_print_errors_fp(stderr);
         SSL_CTX_free(m_ctx);
-        throw CommunoException(CommunoException::err_fileopen, false, "Error loading TLS cert file");
+        throw CommunoException(CommunoException::err_fileopen, false,
+                               "Error loading TLS cert file");
         return;
     }
 
     // Load the server's private key.
-    if (SSL_CTX_use_PrivateKey_file(
-            m_ctx,
-            tls_key_file,
-            SSL_FILETYPE_PEM) != 1) {
+    if (SSL_CTX_use_PrivateKey_file(m_ctx, tls_key_file, SSL_FILETYPE_PEM) != 1)
+    {
 
         ERR_print_errors_fp(stderr);
         SSL_CTX_free(m_ctx);
-        throw CommunoException(CommunoException::err_fileopen, false, "Error loading TLS key file");
+        throw CommunoException(CommunoException::err_fileopen, false,
+                               "Error loading TLS key file");
         return;
     }
 
     // Make sure the private key matches the certificate.
-    if (SSL_CTX_check_private_key(m_ctx) != 1) {
+    if (SSL_CTX_check_private_key(m_ctx) != 1)
+    {
         ERR_print_errors_fp(stderr);
         SSL_CTX_free(m_ctx);
-        throw CommunoException(CommunoException::err_tls, false, "Private key don't match certificate");
+        throw CommunoException(CommunoException::err_tls, false,
+                               "Private key don't match certificate");
         return;
     }
     else
@@ -287,55 +283,53 @@ void Server::InitSSL()
     }
 
     // Recommended TLS options.
-    SSL_CTX_set_options(
-        m_ctx,
-        SSL_OP_NO_COMPRESSION
-    );
+    SSL_CTX_set_options(m_ctx, SSL_OP_NO_COMPRESSION);
 }
 
 void Server::InitSocket()
 {
     INIT_SOCK;
 
-    //throw CommunoException(CommunoException::err_socket_creation, true);
-    //std::cout << "TEST" << std::endl;
+    // throw CommunoException(CommunoException::err_socket_creation, true);
+    // std::cout << "TEST" << std::endl;
 
-    //create a master socket  
+    // create a master socket
     if ((m_MasterSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
-        throw CommunoException(CommunoException::err_socket_creation, false, "Creation failed");
+        throw CommunoException(CommunoException::err_socket_creation, false,
+                               "Creation failed");
         exit(EXIT_FAILURE);
     }
 
-    //set master socket to allow multiple connections
+    // set master socket to allow multiple connections
     int allowMultipleConnections = true;
-    if (setsockopt(m_MasterSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&allowMultipleConnections,
-        sizeof(allowMultipleConnections)) < 0)
+    if (setsockopt(m_MasterSocket, SOL_SOCKET, SO_REUSEADDR,
+                   (char *)&allowMultipleConnections,
+                   sizeof(allowMultipleConnections)) < 0)
     {
         sLog.log(LOG_FLAG_ERROR, "setsockopt failed");
         exit(EXIT_FAILURE);
     }
 
-    //bind the socket to localhost port
-    if (bind(m_MasterSocket, (struct sockaddr*) & m_Adress, sizeof(m_Adress)) < 0)
+    // bind the socket to localhost port
+    if (bind(m_MasterSocket, (struct sockaddr *)&m_Adress, sizeof(m_Adress)) <
+        0)
     {
         sLog.log(LOG_FLAG_ERROR, "bind failed");
         exit(EXIT_FAILURE);
     }
     printf("Listener on port %d \n", PORT);
 
-    //try to specify maximum of 3 pending connections for the master socket  
+    // try to specify maximum of 3 pending connections for the master socket
     if (listen(m_MasterSocket, 3) < 0)
     {
-            sLog.log(LOG_FLAG_ERROR, "listen failed");
-            exit(EXIT_FAILURE);
+        sLog.log(LOG_FLAG_ERROR, "listen failed");
+        exit(EXIT_FAILURE);
     }
 
     sLog.log(LOG_FLAG_INFO, "Waiting for connections ...");
 
     m_ServerState = eServerState::STARTED;
-
-    
 }
 
 void Server::InitEntities()
@@ -349,22 +343,19 @@ void Server::InitEntities()
     sLog.log(LOG_FLAG_DEBUG, "Loaded Chat rooms.");
 }
 
-void Server::Cleanup()
-{
-    CLEANUP_SOCK;
-}
+void Server::Cleanup() { CLEANUP_SOCK; }
 
 void Server::SetSendHelloMessagesToNewClients(bool send)
 {
     m_SendHelloMsg = send;
 }
 
-void Server::SendMsgToSocket(ClientSocket* client, const char* msg)
+void Server::SendMsgToSocket(ClientSocket *client, const char *msg)
 {
     std::string packet;
 
     unsigned short int opcode = htons(SMSG_MESSAGE);
-    packet.append(reinterpret_cast<const char*>(&opcode), sizeof(opcode));
+    packet.append(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
     packet += msg;
 
     SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_MESSAGE));
@@ -372,29 +363,22 @@ void Server::SendMsgToSocket(ClientSocket* client, const char* msg)
     sLog.log(LOG_FLAG_DEBUG, "SMSG_MESSAGE sent");
 }
 
-void Server::SendMOTD(ClientSocket& socket)
+void Server::SendMOTD(ClientSocket &socket)
 {
     std::string reply;
 
     unsigned short int opcode = htons(SMSG_MOTD);
 
-    reply.append(
-        reinterpret_cast<const char*>(&opcode),
-        sizeof(opcode)
-    );
+    reply.append(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
 
     reply += m_HelloMsg;
 
-    const char* data = reply.data();
+    const char *data = reply.data();
     size_t remaining = reply.size();
 
     while (remaining > 0)
     {
-        int written = SSL_write(
-            socket.ssl,
-            data,
-            static_cast<int>(remaining)
-        );
+        int written = SSL_write(socket.ssl, data, static_cast<int>(remaining));
 
         if (written <= 0)
         {
@@ -402,8 +386,8 @@ void Server::SendMOTD(ClientSocket& socket)
 
             sLog.log(
                 LOG_FLAG_ERROR,
-                std::string("Failed to send SMSG_MOTD over TLS, SSL error: ") + std::to_string(sslError)
-            );
+                std::string("Failed to send SMSG_MOTD over TLS, SSL error: ") +
+                    std::to_string(sslError));
 
             break;
         }
@@ -420,26 +404,26 @@ void Server::SendMOTD(ClientSocket& socket)
 
 void Server::PoolActivity()
 {
-    //clear the socket set  
+    // clear the socket set
     FD_ZERO(&m_Readfds);
 
-    //add master socket to set  
+    // add master socket to set
     FD_SET(m_MasterSocket, &m_Readfds);
     int max_sd = m_MasterSocket;
 
-    //add child sockets to set
-    for (const auto& itr : m_ClientSocket)
+    // add child sockets to set
+    for (const auto &itr : m_ClientSocket)
     {
-        //if valid socket descriptor then add to read list  
+        // if valid socket descriptor then add to read list
         if (itr.socket > 0)
             FD_SET(itr.socket, &m_Readfds);
 
-        //highest file descriptor number, need it for the select function  
+        // highest file descriptor number, need it for the select function
         if (itr.socket > max_sd)
             max_sd = itr.socket;
     }
 
-    //pool activity on one of the sockets  
+    // pool activity on one of the sockets
     int activity = select(max_sd + 1, &m_Readfds, nullptr, nullptr, &tv);
 
     if ((activity < 0) && (errno != EINTR))
@@ -450,42 +434,44 @@ void Server::PoolActivity()
 
 void Server::HandleNewConnections()
 {
-    //If something happened on the master socket ,  
-    //then its an incoming connection  
+    // If something happened on the master socket ,
+    // then its an incoming connection
     if (FD_ISSET(m_MasterSocket, &m_Readfds))
     {
-        int new_socket = accept(m_MasterSocket, (struct sockaddr*) & m_Adress, (socklen_t*)&m_AddrLen);
+        int new_socket = accept(m_MasterSocket, (struct sockaddr *)&m_Adress,
+                                (socklen_t *)&m_AddrLen);
         if (new_socket < 0)
         {
             perror("accept");
             return;
         }
 
-        //inform user of socket number - used in send and receive commands  
+        // inform user of socket number - used in send and receive commands
         std::stringstream connLog;
-        connLog << "New connection, socket fd is: " << new_socket \
-        << ", ip is: " << inet_ntoa(m_Adress.sin_addr) \
-        << ", port: " << ntohs(m_Adress.sin_port);
+        connLog << "New connection, socket fd is: " << new_socket
+                << ", ip is: " << inet_ntoa(m_Adress.sin_addr)
+                << ", port: " << ntohs(m_Adress.sin_port);
         sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
         // Make the client socket non-blocking.
         int flags = fcntl(new_socket, F_GETFL, 0);
         fcntl(new_socket, F_SETFL, flags | O_NONBLOCK);
 
-        //add new socket to array of sockets
+        // add new socket to array of sockets
         ClientSocket client(new_socket);
         client.clientID = m_UniqueCLientCounter++;
 
         if (client.InitSSL(m_ctx, 10))
         {
-            
+
             m_ClientSocket.push_back(std::move(client));
             connLog.str("");
             connLog.clear();
-            connLog << "Adding to list of sockets as: " << m_ClientSocket.size() - 1;
+            connLog << "Adding to list of sockets as: "
+                    << m_ClientSocket.size() - 1;
             sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            //send new connection greeting message  
+            // send new connection greeting message
             if (m_SendHelloMsg)
             {
                 sendHelloMsg(m_ClientSocket[m_ClientSocket.size() - 1]);
@@ -497,15 +483,14 @@ void Server::HandleNewConnections()
             close(new_socket);
             sLog.log(LOG_FLAG_DEBUG, "SSL handshake failed, socket freed.");
         }
-
     }
 }
 
 void Server::ProcessRequests()
 {
-    //else its some IO operation on some other socket 
+    // else its some IO operation on some other socket
     for (std::vector<ClientSocket>::iterator it = m_ClientSocket.begin();
-        it != m_ClientSocket.end(); )
+         it != m_ClientSocket.end();)
     {
         int socket = it->socket;
 
@@ -522,15 +507,13 @@ void Server::ProcessRequests()
 
             if (valread <= 0)
             {
-                getpeername(socket,
-                            (struct sockaddr*)&m_Adress,
-                            (socklen_t*)&m_AddrLen);
+                getpeername(socket, (struct sockaddr *)&m_Adress,
+                            (socklen_t *)&m_AddrLen);
 
                 std::stringstream connLog;
                 connLog << "Host disconnected, ip is: "
                         << inet_ntoa(m_Adress.sin_addr)
-                        << ", port: "
-                        << ntohs(m_Adress.sin_port);
+                        << ", port: " << ntohs(m_Adress.sin_port);
 
                 sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
@@ -548,10 +531,9 @@ void Server::ProcessRequests()
             else
             {
                 std::string reply = "Invalid packet.";
-                
-                int sent = SSL_write(it->ssl,
-                                    reply.data(),
-                                    static_cast<int>(reply.size()));
+
+                int sent = SSL_write(it->ssl, reply.data(),
+                                     static_cast<int>(reply.size()));
 
                 if (sent <= 0)
                 {
@@ -566,9 +548,10 @@ void Server::ProcessRequests()
     }
 }
 
-void Server::SendSSLPacketToClientSocket(ClientSocket* client, 
-        std::string const &packet,
-        const std::string& opcodeFancyName /*= "[SMSG_DEFAULT_OPCODE_NAME (undefined)]"*/)
+void Server::SendSSLPacketToClientSocket(
+    ClientSocket *client, std::string const &packet,
+    const std::string
+        &opcodeFancyName /*= "[SMSG_DEFAULT_OPCODE_NAME (undefined)]"*/)
 {
     // Log the packet sending
     std::stringstream connLog;
@@ -577,11 +560,8 @@ void Server::SendSSLPacketToClientSocket(ClientSocket* client,
     sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
     // Send the packet to the client socket
-    int sent = SSL_write(
-        client->ssl,
-        packet.data(),
-        static_cast<int>(packet.size())
-    );
+    int sent =
+        SSL_write(client->ssl, packet.data(), static_cast<int>(packet.size()));
 
     // check return codes
     if (sent <= 0)
@@ -589,8 +569,7 @@ void Server::SendSSLPacketToClientSocket(ClientSocket* client,
         int sslError = SSL_get_error(client->ssl, sent);
 
         std::stringstream errorLog;
-        errorLog << "SSL_write failed for "
-                 << opcodeFancyName
+        errorLog << "SSL_write failed for " << opcodeFancyName
                  << ", SSL error: " << sslError;
 
         sLog.log(LOG_FLAG_DEBUG, errorLog.str());
@@ -598,7 +577,7 @@ void Server::SendSSLPacketToClientSocket(ClientSocket* client,
     }
 }
 
-void Server::CallHandler(ClientSocket* client, int payloadSize)
+void Server::CallHandler(ClientSocket *client, int payloadSize)
 {
     unsigned short int opcode;
     memcpy(&opcode, buffer, sizeof(opcode));
@@ -607,161 +586,169 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
     std::stringstream connLog;
     connLog << "Received opcode: ";
 
-    std::string _payload; // CMSG_ECHO_REQUEST
+    std::string _payload;   // CMSG_ECHO_REQUEST
     size_t offset, minSize; // CMSG_ADDITION_REQUEST
 
-    switch (opcode) {
-        case CMSG_ECHO_REQUEST:
-            // extract the message here
-            _payload = std::string(buffer + sizeof(opcode), payloadSize - sizeof(opcode));
+    switch (opcode)
+    {
+    case CMSG_ECHO_REQUEST:
+        // extract the message here
+        _payload =
+            std::string(buffer + sizeof(opcode), payloadSize - sizeof(opcode));
 
-            connLog << OPCODE_STR(CMSG_ECHO_REQUEST) << std::endl;
-            connLog << "payload: " << _payload.c_str();
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        connLog << OPCODE_STR(CMSG_ECHO_REQUEST) << std::endl;
+        connLog << "payload: " << _payload.c_str();
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            CallHandlerEcho(client, _payload);
-            break;
-        case CMSG_ADDITION_REQUEST:
-            connLog << OPCODE_STR(CMSG_ADDITION_REQUEST);
+        CallHandlerEcho(client, _payload);
+        break;
+    case CMSG_ADDITION_REQUEST:
+        connLog << OPCODE_STR(CMSG_ADDITION_REQUEST);
 
-            // check minimal required packet size
-            offset = sizeof(opcode);
-            //        opcode + 2 number types           + smallest numbers (2)
-            minSize = offset + sizeof(eNumberTypes) * 2 + sizeof(uint8_t) * 2;
+        // check minimal required packet size
+        offset = sizeof(opcode);
+        //        opcode + 2 number types           + smallest numbers (2)
+        minSize = offset + sizeof(eNumberTypes) * 2 + sizeof(uint8_t) * 2;
 
-            if (minSize > payloadSize)
-                connLog << "Invalid opcode length, aborting handler call" << std::endl;
-            
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        if (minSize > payloadSize)
+            connLog << "Invalid opcode length, aborting handler call"
+                    << std::endl;
 
-            if (minSize <= payloadSize)
-                CallHandlerAdd(client, offset, payloadSize);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            break;
+        if (minSize <= payloadSize)
+            CallHandlerAdd(client, offset, payloadSize);
 
-        case CMSG_BROADCAST_MESSAGE:
-            // extract the message here
-            _payload = std::string(buffer + sizeof(opcode), payloadSize - sizeof(opcode));
+        break;
 
-            connLog << OPCODE_STR(CMSG_BROADCAST_MESSAGE) << std::endl;
-            connLog << "payload: " << _payload.c_str();
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+    case CMSG_BROADCAST_MESSAGE:
+        // extract the message here
+        _payload =
+            std::string(buffer + sizeof(opcode), payloadSize - sizeof(opcode));
 
-            CallHandlerBroadcast(_payload);
-            break;
-        case CMSG_GET_CLIENT_LIST:
-            connLog << OPCODE_STR(CMSG_GET_CLIENT_LIST);
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        connLog << OPCODE_STR(CMSG_BROADCAST_MESSAGE) << std::endl;
+        connLog << "payload: " << _payload.c_str();
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            CallHandlerGetClientList(client);
-            break;
-        case CMSG_SEND_MSG_TO_CLIENT:
-        {
-            connLog << OPCODE_STR(CMSG_SEND_MSG_TO_CLIENT);
+        CallHandlerBroadcast(_payload);
+        break;
+    case CMSG_GET_CLIENT_LIST:
+        connLog << OPCODE_STR(CMSG_GET_CLIENT_LIST);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            // check minimal required packet size
-            offset = sizeof(opcode);
-            //        opcode + Client ID
-            minSize = offset + sizeof(uint64_t);
+        CallHandlerGetClientList(client);
+        break;
+    case CMSG_SEND_MSG_TO_CLIENT:
+    {
+        connLog << OPCODE_STR(CMSG_SEND_MSG_TO_CLIENT);
 
-            if (minSize > payloadSize)
-                connLog << "Invalid opcode length, aborting handler call" << std::endl;
-            
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        // check minimal required packet size
+        offset = sizeof(opcode);
+        //        opcode + Client ID
+        minSize = offset + sizeof(uint64_t);
 
-            if (minSize <= payloadSize)
-                CallHandlerMsgToClient(client, offset, payloadSize);
-            break;
-        }
-        case CMSG_PING:
-            connLog << OPCODE_STR(CMSG_PING);
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        if (minSize > payloadSize)
+            connLog << "Invalid opcode length, aborting handler call"
+                    << std::endl;
 
-            CallHandlerPong(client);
-            break;
-        case CMSG_UPTIME:
-            connLog << OPCODE_STR(CMSG_UPTIME);
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            CallHandlerUptime(client);
-            break;
-        case CMSG_INCREMENT_COUNTER:
-            connLog << OPCODE_STR(CMSG_INCREMENT_COUNTER);
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        if (minSize <= payloadSize)
+            CallHandlerMsgToClient(client, offset, payloadSize);
+        break;
+    }
+    case CMSG_PING:
+        connLog << OPCODE_STR(CMSG_PING);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            sUniverse.incrementCounter();
-            break;
-        case CMSG_GET_COUNTER:
-            connLog << OPCODE_STR(CMSG_GET_COUNTER);
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        CallHandlerPong(client);
+        break;
+    case CMSG_UPTIME:
+        connLog << OPCODE_STR(CMSG_UPTIME);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            CallHandlerGetCounter(client);
-            break;
-        case CMSG_GET_CHAT_ROOMS:
-            connLog << OPCODE_STR(CMSG_GET_CHAT_ROOMS);
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        CallHandlerUptime(client);
+        break;
+    case CMSG_INCREMENT_COUNTER:
+        connLog << OPCODE_STR(CMSG_INCREMENT_COUNTER);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            CallHandlerGetChatRooms(client);
-            break;
-        case CMSG_GET_ROOM_INFO:
-            connLog << OPCODE_STR(CMSG_GET_ROOM_INFO);
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        sUniverse.incrementCounter();
+        break;
+    case CMSG_GET_COUNTER:
+        connLog << OPCODE_STR(CMSG_GET_COUNTER);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            CallHandlerGetRoominfo(client);
-            break;
-        case CMSG_JOIN_ROOM:
-        {
-            offset = sizeof(opcode);
+        CallHandlerGetCounter(client);
+        break;
+    case CMSG_GET_CHAT_ROOMS:
+        connLog << OPCODE_STR(CMSG_GET_CHAT_ROOMS);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            size_t requiredSize = offset + sizeof(uint8_t) + SHA256_DIGEST_LENGTH;
+        CallHandlerGetChatRooms(client);
+        break;
+    case CMSG_GET_ROOM_INFO:
+        connLog << OPCODE_STR(CMSG_GET_ROOM_INFO);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            if (payloadSize != requiredSize)
-                connLog << "Invalid opcode length, aborting handler call" << std::endl;
-            
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        CallHandlerGetRoominfo(client);
+        break;
+    case CMSG_JOIN_ROOM:
+    {
+        offset = sizeof(opcode);
 
-            if (requiredSize == payloadSize)
-                CallHandlerJoinRoom(client, offset, payloadSize);
+        size_t requiredSize = offset + sizeof(uint8_t) + SHA256_DIGEST_LENGTH;
 
-            break;
-        }
-        case CMSG_SAY:
-        {
-            // extract the message here
-            _payload = std::string(buffer + sizeof(opcode), payloadSize - sizeof(opcode));
+        if (payloadSize != requiredSize)
+            connLog << "Invalid opcode length, aborting handler call"
+                    << std::endl;
 
-            connLog << OPCODE_STR(CMSG_SAY) << std::endl;
-            connLog << "payload: " << _payload.c_str();
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-            CallHandlerSay(client, _payload);
-            break;
-        }
-        default:
-            // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
-            uint16_t CMSG_UNKNOWN_OPCODE = opcode;
-            connLog << OPCODE_STR(CMSG_UNKNOWN_OPCODE);
-            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+        if (requiredSize == payloadSize)
+            CallHandlerJoinRoom(client, offset, payloadSize);
 
-            // Send reply to the client
-            std::string errMsg = "Unknown or unhandled opcode.";
-            SendMsgToSocket(client, errMsg);
-            break;
+        break;
+    }
+    case CMSG_SAY:
+    {
+        // extract the message here
+        _payload =
+            std::string(buffer + sizeof(opcode), payloadSize - sizeof(opcode));
+
+        connLog << OPCODE_STR(CMSG_SAY) << std::endl;
+        connLog << "payload: " << _payload.c_str();
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+        CallHandlerSay(client, _payload);
+        break;
+    }
+    default:
+        // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
+        uint16_t CMSG_UNKNOWN_OPCODE = opcode;
+        connLog << OPCODE_STR(CMSG_UNKNOWN_OPCODE);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+        // Send reply to the client
+        std::string errMsg = "Unknown or unhandled opcode.";
+        SendMsgToSocket(client, errMsg);
+        break;
     }
 }
 
-void Server::CallHandlerEcho(ClientSocket* client, std::string reply)
+void Server::CallHandlerEcho(ClientSocket *client, std::string reply)
 {
     std::string packet;
 
     unsigned short int ropcode = htons(SMSG_ECHO_REQUEST);
-    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
     packet += reply;
 
     SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_ECHO_REQUEST));
 }
 
-void Server::CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize)
+void Server::CallHandlerAdd(ClientSocket *client, size_t offset,
+                            int payloadSize)
 {
     std::stringstream connLog;
 
@@ -770,17 +757,19 @@ void Server::CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize
     while (offset < payloadSize)
     {
         // Get number types to parse
-        eNumberTypes type = static_cast<eNumberTypes>(static_cast<uint8_t>(buffer[offset++]));
+        eNumberTypes type =
+            static_cast<eNumberTypes>(static_cast<uint8_t>(buffer[offset++]));
 
         // Retrieve number values
         Number num = read_number(buffer, offset, type);
 
-        sLog.log(LOG_FLAG_DEBUG, std::string("Number type:") + std::to_string(type) + " -> " + number_to_string(num));
+        sLog.log(LOG_FLAG_DEBUG, std::string("Number type:") +
+                                     std::to_string(type) + " -> " +
+                                     number_to_string(num));
 
         // cast everithing to double and perform the sum
-        double val = std::visit([](auto v) {
-                 return static_cast<double>(v);
-            }, num);
+        double val =
+            std::visit([](auto v) { return static_cast<double>(v); }, num);
 
         sum += val;
     }
@@ -790,10 +779,11 @@ void Server::CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize
     // generate response packet
     std::string packet;
     unsigned short int ropcode = htons(SMSG_ADDITION_REQUEST);
-    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
-    packet.append(reinterpret_cast<const char*>(&sum), sizeof(sum));
+    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char *>(&sum), sizeof(sum));
 
-    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_ADDITION_REQUEST));
+    SendSSLPacketToClientSocket(client, packet,
+                                OPCODE_OSTR(SMSG_ADDITION_REQUEST));
 }
 
 void Server::CallHandlerBroadcast(std::string const stream)
@@ -801,21 +791,23 @@ void Server::CallHandlerBroadcast(std::string const stream)
     std::string packet;
 
     unsigned short int ropcode = htons(SMSG_BROADCAST);
-    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
     packet += stream;
 
-    sLog.log(LOG_FLAG_DEBUG, std::string("Known clients: ") + std::to_string(m_ClientSocket.size()));
+    sLog.log(LOG_FLAG_DEBUG, std::string("Known clients: ") +
+                                 std::to_string(m_ClientSocket.size()));
 
-    for (ClientSocket& client : m_ClientSocket)
+    for (ClientSocket &client : m_ClientSocket)
     {
         if (!client.sslEnabled)
             continue;
 
-        SendSSLPacketToClientSocket(&client, packet, OPCODE_OSTR(SMSG_BROADCAST));
+        SendSSLPacketToClientSocket(&client, packet,
+                                    OPCODE_OSTR(SMSG_BROADCAST));
     }
 }
 
-void Server::CallHandlerGetClientList(ClientSocket* client)
+void Server::CallHandlerGetClientList(ClientSocket *client)
 {
     // Packet:
     // [uint16 opcode]
@@ -828,15 +820,16 @@ void Server::CallHandlerGetClientList(ClientSocket* client)
 
     uint8_t error = ERR_OK;
     unsigned short int ropcode = htons(SMSG_CLIENT_LIST);
-    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
 
     if (m_ClientSocket.size() > 0)
     {
-        for (ClientSocket& _client : m_ClientSocket)
+        for (ClientSocket &_client : m_ClientSocket)
         {
             // append client ID
             uint64_t clientID = htobe64(_client.clientID);
-            clientList.append(reinterpret_cast<const char*>(&clientID), sizeof(clientID));
+            clientList.append(reinterpret_cast<const char *>(&clientID),
+                              sizeof(clientID));
 
             // Get client username
             std::string username = _client.clientUsername;
@@ -844,8 +837,10 @@ void Server::CallHandlerGetClientList(ClientSocket* client)
                 username += " (you)";
 
             // write username
-            uint16_t usernameSize = htons(static_cast<uint16_t>(username.size()));
-            clientList.append(reinterpret_cast<const char*>(&usernameSize), sizeof(usernameSize));
+            uint16_t usernameSize =
+                htons(static_cast<uint16_t>(username.size()));
+            clientList.append(reinterpret_cast<const char *>(&usernameSize),
+                              sizeof(usernameSize));
             clientList.append(username);
         }
     }
@@ -858,24 +853,25 @@ void Server::CallHandlerGetClientList(ClientSocket* client)
 
     if (packetSize <= 4096)
     {
-        packet.append(reinterpret_cast<const char*>(&error), sizeof(error));
+        packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
         packet.append(clientList);
     }
     else
     {
         error = ERR_TOO_MUCH_CLIENTS;
-        packet.append(reinterpret_cast<const char*>(&error), sizeof(error));
+        packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
     }
 
     SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_CLIENT_LIST));
 }
 
-void Server::CallHandlerMsgToClient(ClientSocket* client, size_t offset, int payloadSize)
+void Server::CallHandlerMsgToClient(ClientSocket *client, size_t offset,
+                                    int payloadSize)
 {
     std::string packet, message;
     uint8_t error = ERR_OK;
     uint64_t clientID = 0;
-    ClientSocket* foundClient = nullptr;
+    ClientSocket *foundClient = nullptr;
 
     // Get Client ID
     std::memcpy(&clientID, buffer + offset, sizeof(clientID));
@@ -886,7 +882,7 @@ void Server::CallHandlerMsgToClient(ClientSocket* client, size_t offset, int pay
         error = ERR_MSG_TO_SELF;
     else
     {
-        for (ClientSocket& _client : m_ClientSocket)
+        for (ClientSocket &_client : m_ClientSocket)
         {
             if (_client.clientID == clientID)
             {
@@ -902,10 +898,8 @@ void Server::CallHandlerMsgToClient(ClientSocket* client, size_t offset, int pay
     // Get message
     if (error == ERR_OK)
     {
-        message = std::string(
-            reinterpret_cast<const char*>(buffer + offset),
-            payloadSize
-        );
+        message = std::string(reinterpret_cast<const char *>(buffer + offset),
+                              payloadSize);
 
         if (message.empty())
             error = ERR_EMPTY_MESSAGE;
@@ -913,9 +907,10 @@ void Server::CallHandlerMsgToClient(ClientSocket* client, size_t offset, int pay
 
     // Send status to the "from" client
     unsigned short int ropcode = htons(SMSG_PRIVATE_MSG_ERR);
-    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
-    packet.append(reinterpret_cast<const char*>(&error), sizeof(error));
-    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_PRIVATE_MSG_ERR));
+    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
+    SendSSLPacketToClientSocket(client, packet,
+                                OPCODE_OSTR(SMSG_PRIVATE_MSG_ERR));
 
     // send message to foundClient if everything is correct
     if (error == ERR_OK)
@@ -925,36 +920,39 @@ void Server::CallHandlerMsgToClient(ClientSocket* client, size_t offset, int pay
 
         // Prepare message
         ropcode = htons(SMSG_PRIVATE_MESSAGE);
-        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
-        packet.append(reinterpret_cast<const char*>(&client->clientID), sizeof(client->clientID));
+        packet.append(reinterpret_cast<const char *>(&ropcode),
+                      sizeof(ropcode));
+        packet.append(reinterpret_cast<const char *>(&client->clientID),
+                      sizeof(client->clientID));
         packet += message;
 
-        SendSSLPacketToClientSocket(foundClient, packet, OPCODE_OSTR(SMSG_PRIVATE_MESSAGE));
+        SendSSLPacketToClientSocket(foundClient, packet,
+                                    OPCODE_OSTR(SMSG_PRIVATE_MESSAGE));
     }
 }
 
-void Server::CallHandlerPong(ClientSocket* client)
+void Server::CallHandlerPong(ClientSocket *client)
 {
     std::string packet;
 
     unsigned short int ropcode = htons(SMSG_PONG);
-    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
 
     SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_PONG));
 }
 
-void Server::CallHandlerUptime(ClientSocket* client)
+void Server::CallHandlerUptime(ClientSocket *client)
 {
     std::string packet;
 
     unsigned short int ropcode = htons(SMSG_UPTIME);
-    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
 
     // compute uptime
     auto now = std::chrono::steady_clock::now();
-    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
-        now - m_StartTime
-    ).count();
+    auto seconds =
+        std::chrono::duration_cast<std::chrono::seconds>(now - m_StartTime)
+            .count();
 
     auto hours = seconds / 3600;
     seconds %= 3600;
@@ -963,38 +961,37 @@ void Server::CallHandlerUptime(ClientSocket* client)
     seconds %= 60;
 
     // Format uptime
-    packet += "Uptime: " +
-          std::to_string(hours) + "h " +
-          std::to_string(minutes) + "m " +
-          std::to_string(seconds) + "s";
+    packet += "Uptime: " + std::to_string(hours) + "h " +
+              std::to_string(minutes) + "m " + std::to_string(seconds) + "s";
 
     SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_UPTIME));
 }
 
-void Server::CallHandlerGetCounter(ClientSocket* client)
+void Server::CallHandlerGetCounter(ClientSocket *client)
 {
     std::string packet;
 
     unsigned short int ropcode = htons(SMSG_COUNTER);
-    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
 
     uint64_t counter = sUniverse.getCounter();
-    packet.append(reinterpret_cast<const char*>(&counter), sizeof(counter));
+    packet.append(reinterpret_cast<const char *>(&counter), sizeof(counter));
 
     SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_COUNTER));
 }
 
-void Server::CallHandlerGetChatRooms(ClientSocket* client)
+void Server::CallHandlerGetChatRooms(ClientSocket *client)
 {
     SendMsgToSocket(client, sChat.getChatRoomsStr());
 }
 
-void Server::CallHandlerGetRoominfo(ClientSocket* client)
+void Server::CallHandlerGetRoominfo(ClientSocket *client)
 {
     std::string msg;
     uint8_t roomID = client->joinedChatRoomID;
 
-    std::cout << "client->joinedChatRoomID" << std::to_string(roomID) << std::endl;
+    std::cout << "client->joinedChatRoomID" << std::to_string(roomID)
+              << std::endl;
 
     if (client->chatRoomJoined == false)
         msg += "No joined room";
@@ -1009,7 +1006,8 @@ void Server::CallHandlerGetRoominfo(ClientSocket* client)
     SendMsgToSocket(client, msg);
 }
 
-void Server::CallHandlerJoinRoom(ClientSocket* client, size_t offset, int payloadSize)
+void Server::CallHandlerJoinRoom(ClientSocket *client, size_t offset,
+                                 int payloadSize)
 {
     std::string packet;
     uint8_t error = ERR_OK;
@@ -1033,24 +1031,28 @@ void Server::CallHandlerJoinRoom(ClientSocket* client, size_t offset, int payloa
         client->chatRoomJoined = true;
 
         unsigned short int ropcode = htons(SMSG_JOIN_CHAT_ROOM_OK);
-        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+        packet.append(reinterpret_cast<const char *>(&ropcode),
+                      sizeof(ropcode));
 
-        packet.append(reinterpret_cast<const char*>(&roomID), sizeof(roomID));
+        packet.append(reinterpret_cast<const char *>(&roomID), sizeof(roomID));
 
-        SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_JOIN_CHAT_ROOM_OK));
+        SendSSLPacketToClientSocket(client, packet,
+                                    OPCODE_OSTR(SMSG_JOIN_CHAT_ROOM_OK));
     }
     else
     {
         unsigned short int ropcode = htons(SMSG_JOIN_CHAT_ROOM_ERR);
-        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+        packet.append(reinterpret_cast<const char *>(&ropcode),
+                      sizeof(ropcode));
 
-        packet.append(reinterpret_cast<const char*>(&error), sizeof(error));
+        packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
 
-        SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_JOIN_CHAT_ROOM_ERR));
+        SendSSLPacketToClientSocket(client, packet,
+                                    OPCODE_OSTR(SMSG_JOIN_CHAT_ROOM_ERR));
     }
 }
 
-void Server::CallHandlerSay(ClientSocket* client, std::string message)
+void Server::CallHandlerSay(ClientSocket *client, std::string message)
 {
     std::string packet = "";
     uint8_t roomID = client->joinedChatRoomID;
@@ -1060,17 +1062,19 @@ void Server::CallHandlerSay(ClientSocket* client, std::string message)
     {
         // the room is valid, send that everything is OK
         ropcode = htons(SMSG_SAY_OK);
-        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+        packet.append(reinterpret_cast<const char *>(&ropcode),
+                      sizeof(ropcode));
         SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_SAY_OK));
 
         // prepare message packet
         packet = "";
         ropcode = htons(SMSG_SAY);
-        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+        packet.append(reinterpret_cast<const char *>(&ropcode),
+                      sizeof(ropcode));
         packet += message;
 
         // Broadcast messages to valid clients
-        for (ClientSocket& _client : m_ClientSocket)
+        for (ClientSocket &_client : m_ClientSocket)
         {
             if (!_client.sslEnabled)
                 continue;
@@ -1078,7 +1082,8 @@ void Server::CallHandlerSay(ClientSocket* client, std::string message)
             if (_client.joinedChatRoomID != roomID || !_client.chatRoomJoined)
                 continue;
 
-            SendSSLPacketToClientSocket(&_client, packet, OPCODE_OSTR(SMSG_BROADCAST));
+            SendSSLPacketToClientSocket(&_client, packet,
+                                        OPCODE_OSTR(SMSG_BROADCAST));
         }
     }
     else
@@ -1089,8 +1094,9 @@ void Server::CallHandlerSay(ClientSocket* client, std::string message)
             error = ERR_NO_ROOM_JOINED;
 
         ropcode = htons(SMSG_SAY_ERR);
-        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
-        packet.append(reinterpret_cast<const char*>(&error), sizeof(error));
+        packet.append(reinterpret_cast<const char *>(&ropcode),
+                      sizeof(ropcode));
+        packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
 
         SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_SAY_ERR));
     }

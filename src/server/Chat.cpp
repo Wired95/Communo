@@ -1,22 +1,19 @@
 #include "Chat.h"
 #include "Database.h"
 
-#include <iostream>
 #include <cstring>
+#include <iostream>
 
 #include <openssl/sha.h>
 
-void Chat::loadChatRooms()
-{
-    sDatabase.loadRooms(m_ChatRooms);
-}
+void Chat::loadChatRooms() { sDatabase.loadRooms(m_ChatRooms); }
 
 std::string Chat::getChatRoomsStr() const
 {
     std::string rooms;
     for (auto it = m_ChatRooms.begin(); it != m_ChatRooms.end(); ++it)
     {
-        const auto& [roomID, room] = *it;
+        const auto &[roomID, room] = *it;
 
         rooms += '[' + std::to_string(roomID) + "] " + room.name;
         if (room.passwordHash.empty())
@@ -30,13 +27,13 @@ std::string Chat::getChatRoomsStr() const
     return rooms;
 }
 
-bool Chat::checkPasswordHash(uint8_t roomID, const unsigned char* hash)
+bool Chat::checkPasswordHash(uint8_t roomID, const unsigned char *hash)
 {
     bool valid = false;
 
     // Get room password
     unsigned char roomHash[SHA256_DIGEST_LENGTH];
-    const std::string& passwordHash = m_ChatRooms[roomID].passwordHash;
+    const std::string &passwordHash = m_ChatRooms[roomID].passwordHash;
     std::memcpy(roomHash, passwordHash.data(), SHA256_DIGEST_LENGTH);
 
     // Compare hash

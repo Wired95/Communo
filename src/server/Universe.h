@@ -6,25 +6,19 @@
 
 class Universe
 {
-public:
+  public:
     Universe() : m_Counter(0) {}
 
-    uint64_t const getCounter()
-    {
-        return m_Counter;
-    }
+    uint64_t const getCounter() { return m_Counter; }
 
-    void incrementCounter()
-    {
-        m_Counter++;
-    }
+    void incrementCounter() { m_Counter++; }
 
-private:
+  private:
     uint64_t m_Counter;
 };
 
 // Define Universe singleton
 static Singleton2<Universe> __Universe;
-#define sUniverse           __Universe.getInstance()
+#define sUniverse __Universe.getInstance()
 
 #endif // _UNIVERSE_H_
