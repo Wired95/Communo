@@ -1,7 +1,7 @@
 #include "DebugUtils.h"
 #include "Client.h"
 #include "OpCodes.h"
-#include "Chat.h"
+#include "SharedDefinitions.h"
 
 #include <stdio.h> 
 #include <string>
@@ -333,6 +333,97 @@ void Client::processReplyFromServerIfAny()
                           << '\n' << std::flush;
                 break;
             }
+            case SMSG_CLIENT_LIST:
+            {
+                std::string clientList;
+                uint8_t error;
+
+                // Process error code
+                std::memcpy(&error, payload.data(), sizeof(error));
+                switch(error)
+                {
+                    case ERR_OK:                clientList += "[valid client list]\n"; break;
+                    case ERR_NO_CLIENT_FOUND:   clientList += "[no client found]\n"; break;
+                    case ERR_TOO_MUCH_CLIENTS:  clientList += "[too much clients]\n"; break;
+                    default:                    clientList += "[error: " + std::to_string(error) + "]\n"; break;
+                }
+
+                if (error == ERR_OK)
+                {
+                    size_t offset = sizeof(error);
+                    while (offset < payload.size())
+                    {
+                        if (offset + sizeof(uint64_t) + sizeof(uint16_t) > payload.size())
+                            break;
+
+                        // get client ID
+                        uint64_t clientID;
+                        std::memcpy(&clientID, payload.data() + offset, sizeof(clientID));
+                        clientID = be64toh(clientID);
+                        offset += sizeof(clientID);
+
+                        // get client name length
+                        uint16_t usernameSize;
+                        std::memcpy(&usernameSize, payload.data() + offset, sizeof(usernameSize));
+                        usernameSize = ntohs(usernameSize);
+                        offset += sizeof(usernameSize);
+
+                        if (offset + usernameSize > payload.size())
+                            break;
+
+                        // get client name
+                        std::string clientName(payload.data() + offset, usernameSize);
+                        offset += usernameSize;
+
+                        // format client entry
+                        clientList += '[' + std::to_string(clientID) + "] " + clientName + '\n';
+                    }
+                }
+
+                std::cout << "\rReceived client list "
+                          << OPCODE_STR(SMSG_CLIENT_LIST)
+                          << ":\n" << clientList
+                          << '\n' << std::flush;
+                break;
+            }
+            case SMSG_PRIVATE_MSG_ERR:
+            {
+                std::string errorMessage;
+                uint8_t error;
+                std::memcpy(&error, payload.data(), sizeof(error));
+
+                switch(error)
+                {
+                    case ERR_OK:                errorMessage += "[OK]\n"; break;
+                    case ERR_NO_CLIENT_FOUND:   errorMessage += "[no client found]\n"; break;
+                    case ERR_MSG_TO_SELF:       errorMessage += "[message to self]\n"; break;
+                    case ERR_EMPTY_MESSAGE:     errorMessage += "[empty message]\n"; break;
+                    default:                    errorMessage += "[error: " + std::to_string(error) + "]\n"; break;
+                }
+
+                std::cout << "\rReceived send private message error code "
+                          << OPCODE_STR(SMSG_PRIVATE_MSG_ERR)
+                          << ":\n" << errorMessage
+                          << '\n' << std::flush;
+                break;
+            }
+            case SMSG_PRIVATE_MESSAGE:
+            {
+                uint64_t clientID = 0;
+                std::memcpy(&clientID, payload.data(), sizeof(clientID));
+
+                std::string message(
+                    reinterpret_cast<const char*>(payload.data() + sizeof(clientID)),
+                    payload.size() - sizeof(clientID)
+                );
+
+                std::cout << "\rReceived private message from client [" << std::to_string(clientID) << "] "
+                          << OPCODE_STR(SMSG_PRIVATE_MSG_ERR)
+                          << ":\n" << message
+                          << '\n' << std::flush;
+
+                break;
+            }
             case SMSG_PONG:
             {
                 auto now = std::chrono::steady_clock::now();
@@ -583,6 +674,31 @@ void Client::sendIncrementCounter()
 void Client::sendGetCounter()
 {
     sendSSLOpcodeToServer(CMSG_GET_COUNTER);
+}
+
+void Client::sendGetClients()
+{
+    sendSSLOpcodeToServer(CMSG_GET_CLIENT_LIST);
+}
+
+void Client::sendClientMessage(uint64_t clientID, std::string msg)
+{
+    std::string packet;
+
+    uint16_t opcode = htons(CMSG_SEND_MSG_TO_CLIENT);
+    packet.append(
+        reinterpret_cast<const char*>(&opcode),
+        sizeof(opcode)
+    );
+
+    packet.append(
+        reinterpret_cast<const char*>(&clientID),
+        sizeof(clientID)
+    );
+
+    packet += msg;
+
+    sendSSLPacketToServer(packet);
 }
 
 void Client::sendGetChatRooms()

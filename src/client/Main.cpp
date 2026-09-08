@@ -199,12 +199,63 @@ int main(int argc, char const* argv[])
         client.sendGetCounter();
     });
 
-    /* todo:
-    CMSG_GET_CLIENT_LIST    = 0x0004, // todo
-    CMSG_SEND_MSG_TO_CLIENT = 0x0005, // todo
-    */
+    cli.addCommand("client", [](const std::vector<std::string>&) {
+        std::cout
+            << "Available commands for client:\n"
+            << "  get-clients\n"
+            << "  set-username <username>\n"
+            << "  send-msg <clientID> <msg>\n";
+    });
 
-    cli.addCommand("chat", [&client](const std::vector<std::string>&) {
+    cli.addCommand("client get-clients", [&client](const std::vector<std::string>&) {
+        client.sendGetClients();
+    });
+
+    cli.addCommand("client set-username", [&client](const std::vector<std::string>&) {
+        std::cout << "client set-username\n";
+    });
+
+    cli.addCommand("client send-msg", [&client](const std::vector<std::string>& args) {
+        if (args.size() < 2)
+            throw std::runtime_error("usage: client send-msg <clientID> <msg>");
+
+        Number num;
+        bool validNumbers = true;
+        uint64_t clientID;
+        try
+        {
+            num = parse_number(args[0]);
+        }
+        catch (const std::exception& e)
+        {
+            validNumbers = false;
+            std::cout << "invalid room number: " << e.what() << '\n';
+        }
+
+        if(!is_unsigned_integer(num))
+            validNumbers = false;
+        else
+            clientID = std::visit(
+                [](auto value) -> uint64_t {
+                    return static_cast<uint64_t>(value);
+                },
+                num
+            );
+
+        if (validNumbers)
+        {
+            std::string msg;
+            for (size_t i = 1; i < args.size(); ++i)
+                msg += args[i] + ' ';
+
+            client.sendClientMessage(clientID, msg);
+        }
+        else
+            std::cout << "invalid client ID: " << args[0] << std::endl;
+        
+    });
+
+    cli.addCommand("chat", [](const std::vector<std::string>&) {
         std::cout
             << "Available commands for chat:\n"
             << "  get-rooms\n"

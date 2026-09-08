@@ -24,8 +24,8 @@ enum class eServerState
 
 struct ClientSocket
 {
-    ClientSocket() : socket(0), sslEnabled(false), joinedChatRoomID(ROOM_NONE) {}
-    ClientSocket(int _socket) : socket(_socket), sslEnabled(false), joinedChatRoomID(ROOM_NONE) {}
+    ClientSocket() : socket(0), sslEnabled(false), chatRoomJoined(false), joinedChatRoomID(0), clientID(0), clientUsername("<unk>")  {}
+    ClientSocket(int _socket) : socket(_socket), sslEnabled(false), chatRoomJoined(false), joinedChatRoomID(0), clientID(0), clientUsername("<unk>")  {}
 
     ClientSocket(const ClientSocket&) = delete;
     ClientSocket& operator=(const ClientSocket&) = delete;
@@ -51,7 +51,12 @@ struct ClientSocket
     int socket;
     SSL* ssl;
     bool sslEnabled = false;
+
+    bool chatRoomJoined = false;
     uint8_t joinedChatRoomID;
+
+    uint64_t clientID;
+    std::string clientUsername = "<unk>";
 };
 
 class Server
@@ -100,6 +105,10 @@ private:
 
     std::chrono::steady_clock::time_point m_StartTime;
 
+    // tracks unique client connection count since server startup
+    // Used to give each connected client an unique ID
+    uint64_t m_UniqueCLientCounter;
+
     char buffer[4096];  //data buffer of 4K  
 
     int m_MasterSocket;
@@ -131,6 +140,8 @@ private:
     void CallHandlerEcho(ClientSocket* client, std::string reply);
     void CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize);
     void CallHandlerBroadcast(std::string const stream);
+    void CallHandlerGetClientList(ClientSocket* client);
+    void CallHandlerMsgToClient(ClientSocket* client, size_t offset, int payloadSize);
     void CallHandlerPong(ClientSocket* client);
     void CallHandlerUptime(ClientSocket* client);
     void CallHandlerGetCounter(ClientSocket* client);

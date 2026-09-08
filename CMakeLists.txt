@@ -18,6 +18,16 @@ find_program(OPENSSL_EXECUTABLE
     REQUIRED
 )
 
+# SQLite building
+add_library(sqlite3 STATIC
+    third_party/sqlite/sqlite3.c
+)
+
+target_include_directories(sqlite3
+    PUBLIC
+        third_party/sqlite
+)
+
 # Build configuration
 set(CMAKE_CONFIGURATION_TYPES Debug Release)
 
@@ -48,6 +58,8 @@ if(${BuildType} STREQUAL "server" OR ${BuildType} STREQUAL "all")
     add_executable (Server 
         src/server/Chat.cpp
         src/server/Chat.h
+        src/server/Database.cpp
+        src/server/Database.h
         src/server/Main.cpp
         src/server/Server.cpp
         src/server/Server.h
@@ -61,6 +73,7 @@ if(${BuildType} STREQUAL "server" OR ${BuildType} STREQUAL "all")
         Common
         OpenSSL::SSL
         OpenSSL::Crypto
+        sqlite3
     )
 
     target_include_directories(Server PUBLIC 
@@ -90,7 +103,6 @@ if(${BuildType} STREQUAL "client" OR ${BuildType} STREQUAL "all")
     target_include_directories(Client PUBLIC 
         ${PROJECT_SOURCE_DIR}/src/common/
         ${PROJECT_SOURCE_DIR}/src/client/
-        ${PROJECT_SOURCE_DIR}/src/server/
     )
 
 endif()
@@ -100,76 +112,10 @@ if(WIN32)
         target_link_libraries(Client wsock32 ws2_32)
 endif()
 
-# Certificates generation
+# Self-signed certificates generation
+include(cmake/SelfSignedCertificates.cmake)
 
-
-
-set(TLS_DIR "${CMAKE_CURRENT_BINARY_DIR}/tls")
-file(MAKE_DIRECTORY "${TLS_DIR}")
-
-# CA key + self-signed CA certificate
-execute_process(
-    COMMAND "${OPENSSL_EXECUTABLE}"
-            req -x509 -newkey rsa:2048 -nodes
-            -keyout "${TLS_DIR}/ca.key"
-            -out "${TLS_DIR}/server-ca.pem"
-            -days 3650
-            -subj "/CN=My Local CA"
-    COMMAND_ERROR_IS_FATAL ANY
-)
-
-# Server key + CSR
-execute_process(
-    COMMAND "${OPENSSL_EXECUTABLE}"
-            req -new -newkey rsa:2048 -nodes
-            -keyout "${TLS_DIR}/server.key"
-            -out "${TLS_DIR}/server.csr"
-            -subj "/CN=localhost"
-    COMMAND_ERROR_IS_FATAL ANY
-)
-
-# Sign server certificate with CA
-execute_process(
-    COMMAND "${OPENSSL_EXECUTABLE}"
-            x509 -req
-            -in "${TLS_DIR}/server.csr"
-            -CA "${TLS_DIR}/server-ca.pem"
-            -CAkey "${TLS_DIR}/ca.key"
-            -CAcreateserial
-            -out "${TLS_DIR}/server.cert"
-            -days 3650
-            -sha256
-    COMMAND_ERROR_IS_FATAL ANY
-)
-
-file(REMOVE
-    "${TLS_DIR}/server.csr"
-    "${TLS_DIR}/server-ca.pem.srl"
-)
-
-set(TLS_CA     "${TLS_DIR}/server-ca.pem")
-set(TLS_KEY    "${TLS_DIR}/server.key")
-set(TLS_CERT   "${TLS_DIR}/server.cert")
-
-target_compile_definitions(Common PRIVATE
-    TLS_CA_FILE="${TLS_CA}"
-    TLS_KEY_FILE="${TLS_KEY}"
-    TLS_CERT_FILE="${TLS_CERT}"
-)
-
-target_compile_definitions(Server PRIVATE
-    TLS_CA_FILE="${TLS_CA}"
-    TLS_KEY_FILE="${TLS_KEY}"
-    TLS_CERT_FILE="${TLS_CERT}"
-)
-
-target_compile_definitions(Client PRIVATE
-    TLS_CA_FILE="${TLS_CA}"
-    TLS_KEY_FILE="${TLS_KEY}"
-    TLS_CERT_FILE="${TLS_CERT}"
-)
-
-
-
+# Database creation and loading
+include(cmake/Database.cmake)
 
 

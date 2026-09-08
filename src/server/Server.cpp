@@ -155,13 +155,19 @@ ClientSocket::ClientSocket(ClientSocket&& other) noexcept
     : socket(other.socket),
       ssl(other.ssl),
       sslEnabled(other.sslEnabled),
-      joinedChatRoomID(other.joinedChatRoomID)
+      chatRoomJoined(other.chatRoomJoined),
+      joinedChatRoomID(other.joinedChatRoomID),
+      clientID(other.clientID),
+      clientUsername(other.clientUsername)
 {
     // belts and buckles
     other.socket = INVALID_SOCKET;
     other.ssl = nullptr;
     other.sslEnabled = false;
-    other.joinedChatRoomID = ROOM_NONE;
+    other.chatRoomJoined = false;
+    other.joinedChatRoomID = 0;
+    other.clientID = 0;
+    other.clientUsername = "<unk>";
 }
 
 ClientSocket& ClientSocket::operator=(ClientSocket&& other) noexcept
@@ -181,12 +187,18 @@ ClientSocket& ClientSocket::operator=(ClientSocket&& other) noexcept
         socket = other.socket;
         ssl = other.ssl;
         sslEnabled = other.sslEnabled;
+        chatRoomJoined = other.chatRoomJoined;
         joinedChatRoomID = other.joinedChatRoomID;
+        clientID = other.clientID;
+        clientUsername = other.clientUsername;
 
         other.socket = INVALID_SOCKET;
         other.ssl = nullptr;
         other.sslEnabled = false;
-        other.joinedChatRoomID = ROOM_NONE;
+        other.chatRoomJoined = false;
+        other.joinedChatRoomID = 0;
+        other.clientID = 0;
+        other.clientUsername = "<unk>";
     }
 
     return *this;
@@ -208,6 +220,8 @@ Server::Server()
     m_AddrLen = sizeof(m_Adress);
 
     m_ServerState = eServerState::NOT_STARTED;
+
+    m_UniqueCLientCounter = 0;
 }
 
 Server::~Server()
@@ -460,8 +474,11 @@ void Server::HandleNewConnections()
 
         //add new socket to array of sockets
         ClientSocket client(new_socket);
+        client.clientID = m_UniqueCLientCounter++;
+
         if (client.InitSSL(m_ctx, 10))
         {
+            
             m_ClientSocket.push_back(std::move(client));
             connLog.str("");
             connLog.clear();
@@ -632,6 +649,30 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
 
             CallHandlerBroadcast(_payload);
             break;
+        case CMSG_GET_CLIENT_LIST:
+            connLog << OPCODE_STR(CMSG_GET_CLIENT_LIST);
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            CallHandlerGetClientList(client);
+            break;
+        case CMSG_SEND_MSG_TO_CLIENT:
+        {
+            connLog << OPCODE_STR(CMSG_SEND_MSG_TO_CLIENT);
+
+            // check minimal required packet size
+            offset = sizeof(opcode);
+            //        opcode + Client ID
+            minSize = offset + sizeof(uint64_t);
+
+            if (minSize > payloadSize)
+                connLog << "Invalid opcode length, aborting handler call" << std::endl;
+            
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            if (minSize <= payloadSize)
+                CallHandlerMsgToClient(client, offset, payloadSize);
+            break;
+        }
         case CMSG_PING:
             connLog << OPCODE_STR(CMSG_PING);
             sLog.log(LOG_FLAG_DEBUG, connLog.str());
@@ -774,6 +815,124 @@ void Server::CallHandlerBroadcast(std::string const stream)
     }
 }
 
+void Server::CallHandlerGetClientList(ClientSocket* client)
+{
+    // Packet:
+    // [uint16 opcode]
+    // [uint8  error]
+    // repeated:
+    //   [uint32 clientID]
+    //   [uint16 usernameLength]
+    //   [uint8  username bytes]
+    std::string packet, clientList;
+
+    uint8_t error = ERR_OK;
+    unsigned short int ropcode = htons(SMSG_CLIENT_LIST);
+    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+
+    if (m_ClientSocket.size() > 0)
+    {
+        for (ClientSocket& _client : m_ClientSocket)
+        {
+            // append client ID
+            uint64_t clientID = htobe64(_client.clientID);
+            clientList.append(reinterpret_cast<const char*>(&clientID), sizeof(clientID));
+
+            // Get client username
+            std::string username = _client.clientUsername;
+            if (_client.clientID == client->clientID)
+                username += " (you)";
+
+            // write username
+            uint16_t usernameSize = htons(static_cast<uint16_t>(username.size()));
+            clientList.append(reinterpret_cast<const char*>(&usernameSize), sizeof(usernameSize));
+            clientList.append(username);
+        }
+    }
+    else
+    {
+        error = ERR_NO_CLIENT_FOUND;
+    }
+
+    size_t packetSize = sizeof(ropcode) + sizeof(error) + clientList.size();
+
+    if (packetSize <= 4096)
+    {
+        packet.append(reinterpret_cast<const char*>(&error), sizeof(error));
+        packet.append(clientList);
+    }
+    else
+    {
+        error = ERR_TOO_MUCH_CLIENTS;
+        packet.append(reinterpret_cast<const char*>(&error), sizeof(error));
+    }
+
+    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_CLIENT_LIST));
+}
+
+void Server::CallHandlerMsgToClient(ClientSocket* client, size_t offset, int payloadSize)
+{
+    std::string packet, message;
+    uint8_t error = ERR_OK;
+    uint64_t clientID = 0;
+    ClientSocket* foundClient = nullptr;
+
+    // Get Client ID
+    std::memcpy(&clientID, buffer + offset, sizeof(clientID));
+    offset += sizeof(clientID);
+
+    // Check client ID
+    if (clientID == client->clientID)
+        error = ERR_MSG_TO_SELF;
+    else
+    {
+        for (ClientSocket& _client : m_ClientSocket)
+        {
+            if (_client.clientID == clientID)
+            {
+                foundClient = &_client;
+                break;
+            }
+        }
+
+        if (foundClient == nullptr)
+            error = ERR_NO_CLIENT_FOUND;
+    }
+
+    // Get message
+    if (error == ERR_OK)
+    {
+        message = std::string(
+            reinterpret_cast<const char*>(buffer + offset),
+            payloadSize
+        );
+
+        if (message.empty())
+            error = ERR_EMPTY_MESSAGE;
+    }
+
+    // Send status to the "from" client
+    unsigned short int ropcode = htons(SMSG_PRIVATE_MSG_ERR);
+    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char*>(&error), sizeof(error));
+    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_PRIVATE_MSG_ERR));
+
+    // send message to foundClient if everything is correct
+    if (error == ERR_OK)
+    {
+        // Reset packet
+        packet = "";
+
+        // Prepare message
+        ropcode = htons(SMSG_PRIVATE_MESSAGE);
+        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+        packet.append(reinterpret_cast<const char*>(&client->clientID), sizeof(client->clientID));
+        packet += message;
+
+        SendSSLPacketToClientSocket(foundClient, packet, OPCODE_OSTR(SMSG_PRIVATE_MESSAGE));
+    }
+}
+
 void Server::CallHandlerPong(ClientSocket* client)
 {
     std::string packet;
@@ -837,9 +996,9 @@ void Server::CallHandlerGetRoominfo(ClientSocket* client)
 
     std::cout << "client->joinedChatRoomID" << std::to_string(roomID) << std::endl;
 
-    if (roomID == ROOM_NONE)
+    if (client->chatRoomJoined == false)
         msg += "No joined room";
-    else if (roomID >= MAX_CHAT_ROOMS)
+    else if (!sChat.checkRoomID(roomID))
         msg += "Invalid room";
     else
     {
@@ -871,6 +1030,7 @@ void Server::CallHandlerJoinRoom(ClientSocket* client, size_t offset, int payloa
     if (error == ERR_OK)
     {
         client->joinedChatRoomID = roomID;
+        client->chatRoomJoined = true;
 
         unsigned short int ropcode = htons(SMSG_JOIN_CHAT_ROOM_OK);
         packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
@@ -896,7 +1056,7 @@ void Server::CallHandlerSay(ClientSocket* client, std::string message)
     uint8_t roomID = client->joinedChatRoomID;
     unsigned short int ropcode;
 
-    if (sChat.checkRoomID(roomID))
+    if (sChat.checkRoomID(roomID) && client->chatRoomJoined)
     {
         // the room is valid, send that everything is OK
         ropcode = htons(SMSG_SAY_OK);
@@ -915,7 +1075,7 @@ void Server::CallHandlerSay(ClientSocket* client, std::string message)
             if (!_client.sslEnabled)
                 continue;
 
-            if (_client.joinedChatRoomID != roomID)
+            if (_client.joinedChatRoomID != roomID || !_client.chatRoomJoined)
                 continue;
 
             SendSSLPacketToClientSocket(&_client, packet, OPCODE_OSTR(SMSG_BROADCAST));
@@ -925,7 +1085,7 @@ void Server::CallHandlerSay(ClientSocket* client, std::string message)
     {
         // the room is not valid, send error message
         uint8_t error = ERR_INVALID_ROOM;
-        if (roomID == ROOM_NONE)
+        if (!client->chatRoomJoined)
             error = ERR_NO_ROOM_JOINED;
 
         ropcode = htons(SMSG_SAY_ERR);

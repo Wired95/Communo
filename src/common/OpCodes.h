@@ -28,8 +28,8 @@ enum eOpcodes : uint16_t
 
     CMSG_BROADCAST_MESSAGE  = 0x0003,
 
-    CMSG_GET_CLIENT_LIST    = 0x0004, // todo
-    CMSG_SEND_MSG_TO_CLIENT = 0x0005, // todo
+    CMSG_GET_CLIENT_LIST    = 0x0004,
+    CMSG_SEND_MSG_TO_CLIENT = 0x0005,
 
     CMSG_UPTIME             = 0x0006,
     CMSG_PING               = 0x0007,
@@ -49,16 +49,17 @@ enum eOpcodes : uint16_t
     SMSG_ECHO_REQUEST       = 0x1001,
     SMSG_ADDITION_REQUEST   = 0x1002,
     SMSG_BROADCAST          = 0x1003,
-    SMSG_CLIENT_LIST        = 0x1004, // todo
-    SMSG_PRIVATE_MESSAGE    = 0x1005, // todo
-    SMSG_UPTIME             = 0x1006,
-    SMSG_PONG               = 0x1007,
-    SMSG_COUNTER            = 0x1008,
-    SMSG_JOIN_CHAT_ROOM_OK  = 0x1009,
-    SMSG_JOIN_CHAT_ROOM_ERR = 0x100A,
-    SMSG_SAY_OK             = 0x100B,
-    SMSG_SAY_ERR            = 0x100C,
-    SMSG_SAY                = 0x100D,
+    SMSG_CLIENT_LIST        = 0x1004,
+    SMSG_PRIVATE_MSG_ERR    = 0x1005,
+    SMSG_PRIVATE_MESSAGE    = 0x1006,
+    SMSG_UPTIME             = 0x1007,
+    SMSG_PONG               = 0x1008,
+    SMSG_COUNTER            = 0x1009,
+    SMSG_JOIN_CHAT_ROOM_OK  = 0x100A,
+    SMSG_JOIN_CHAT_ROOM_ERR = 0x100B,
+    SMSG_SAY_OK             = 0x100C,
+    SMSG_SAY_ERR            = 0x100D,
+    SMSG_SAY                = 0x100E,
 
     OPCODE_MAX              = (0x7FFF+1),
 };

@@ -1,24 +1,30 @@
 #include "Chat.h"
+#include "Database.h"
 
 #include <iostream>
 #include <cstring>
 
 #include <openssl/sha.h>
 
+void Chat::loadChatRooms()
+{
+    sDatabase.loadRooms(m_ChatRooms);
+}
+
 std::string Chat::getChatRoomsStr() const
 {
     std::string rooms;
-    for (size_t i = 0; i < MAX_CHAT_ROOMS; ++i)
+    for (auto it = m_ChatRooms.begin(); it != m_ChatRooms.end(); ++it)
     {
-        const auto& room = m_ChatRooms[i];
+        const auto& [roomID, room] = *it;
 
-        rooms += '[' + std::to_string(room.id) + "] " + room.name;
-        if (room.password.empty() || room.password == "")
+        rooms += '[' + std::to_string(roomID) + "] " + room.name;
+        if (room.passwordHash.empty())
             rooms += " (open)";
         else
             rooms += " (protected)";
 
-        if ((i + 1) < MAX_CHAT_ROOMS)
+        if (std::next(it) != m_ChatRooms.end())
             rooms += '\n';
     }
     return rooms;
@@ -30,9 +36,9 @@ bool Chat::checkPasswordHash(uint8_t roomID, const unsigned char* hash)
 
     // Get room password
     unsigned char roomHash[SHA256_DIGEST_LENGTH];
-    const std::string& password = m_ChatRooms[roomID].password;
-    SHA256(reinterpret_cast<const unsigned char*>(password.data()), password.size(), roomHash);
-    
+    const std::string& passwordHash = m_ChatRooms[roomID].passwordHash;
+    std::memcpy(roomHash, passwordHash.data(), SHA256_DIGEST_LENGTH);
+
     // Compare hash
     if (std::memcmp(roomHash, hash, SHA256_DIGEST_LENGTH) == 0)
         valid = true;
