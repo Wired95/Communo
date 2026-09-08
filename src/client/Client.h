@@ -56,6 +56,8 @@ public:
     void sendUptime();
     void sendIncrementCounter();
     void sendGetCounter();
+    void sendGetClients();
+    void sendClientMessage(uint64_t clientID, std::string msg);
     void sendGetChatRooms();
     void sendGetRoomInfo();
     void sendJoinRoomRequest(uint8_t roomID, std::string password);
