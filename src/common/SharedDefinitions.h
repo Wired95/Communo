@@ -36,7 +36,9 @@ enum eChatErr : uint8_t
     ERR_INVALID_PACKET,
     ERR_NO_ROOM_JOINED,
     ERR_NO_CLIENT_FOUND,
+    ERR_MSG_TO_SELF,
     ERR_TOO_MUCH_CLIENTS,
+    ERR_EMPTY_MESSAGE,
 };
 
 #endif // _SHAREDDEFS_H_

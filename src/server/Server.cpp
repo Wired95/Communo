@@ -655,6 +655,24 @@ void Server::CallHandler(ClientSocket* client, int payloadSize)
 
             CallHandlerGetClientList(client);
             break;
+        case CMSG_SEND_MSG_TO_CLIENT:
+        {
+            connLog << OPCODE_STR(CMSG_SEND_MSG_TO_CLIENT);
+
+            // check minimal required packet size
+            offset = sizeof(opcode);
+            //        opcode + Client ID
+            minSize = offset + sizeof(uint64_t);
+
+            if (minSize > payloadSize)
+                connLog << "Invalid opcode length, aborting handler call" << std::endl;
+            
+            sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+            if (minSize <= payloadSize)
+                CallHandlerMsgToClient(client, offset, payloadSize);
+            break;
+        }
         case CMSG_PING:
             connLog << OPCODE_STR(CMSG_PING);
             sLog.log(LOG_FLAG_DEBUG, connLog.str());
@@ -850,6 +868,69 @@ void Server::CallHandlerGetClientList(ClientSocket* client)
     }
 
     SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_CLIENT_LIST));
+}
+
+void Server::CallHandlerMsgToClient(ClientSocket* client, size_t offset, int payloadSize)
+{
+    std::string packet, message;
+    uint8_t error = ERR_OK;
+    uint64_t clientID = 0;
+    ClientSocket* foundClient = nullptr;
+
+    // Get Client ID
+    std::memcpy(&clientID, buffer + offset, sizeof(clientID));
+    offset += sizeof(clientID);
+
+    // Check client ID
+    if (clientID == client->clientID)
+        error = ERR_MSG_TO_SELF;
+    else
+    {
+        for (ClientSocket& _client : m_ClientSocket)
+        {
+            if (_client.clientID == clientID)
+            {
+                foundClient = &_client;
+                break;
+            }
+        }
+
+        if (foundClient == nullptr)
+            error = ERR_NO_CLIENT_FOUND;
+    }
+
+    // Get message
+    if (error == ERR_OK)
+    {
+        message = std::string(
+            reinterpret_cast<const char*>(buffer + offset),
+            payloadSize
+        );
+
+        if (message.empty())
+            error = ERR_EMPTY_MESSAGE;
+    }
+
+    // Send status to the "from" client
+    unsigned short int ropcode = htons(SMSG_PRIVATE_MSG_ERR);
+    packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char*>(&error), sizeof(error));
+    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_PRIVATE_MSG_ERR));
+
+    // send message to foundClient if everything is correct
+    if (error == ERR_OK)
+    {
+        // Reset packet
+        packet = "";
+
+        // Prepare message
+        ropcode = htons(SMSG_PRIVATE_MESSAGE);
+        packet.append(reinterpret_cast<const char*>(&ropcode), sizeof(ropcode));
+        packet.append(reinterpret_cast<const char*>(&client->clientID), sizeof(client->clientID));
+        packet += message;
+
+        SendSSLPacketToClientSocket(foundClient, packet, OPCODE_OSTR(SMSG_PRIVATE_MESSAGE));
+    }
 }
 
 void Server::CallHandlerPong(ClientSocket* client)

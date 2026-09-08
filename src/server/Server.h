@@ -141,6 +141,7 @@ private:
     void CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize);
     void CallHandlerBroadcast(std::string const stream);
     void CallHandlerGetClientList(ClientSocket* client);
+    void CallHandlerMsgToClient(ClientSocket* client, size_t offset, int payloadSize);
     void CallHandlerPong(ClientSocket* client);
     void CallHandlerUptime(ClientSocket* client);
     void CallHandlerGetCounter(ClientSocket* client);
