@@ -55,7 +55,7 @@ add_library(Common STATIC
 
 # Server scripts
 if(${BuildType} STREQUAL "server" OR ${BuildType} STREQUAL "all")
-    add_executable (Server 
+    add_executable (Server
         src/server/Chat.cpp
         src/server/Chat.h
         src/server/Database.cpp
@@ -76,7 +76,7 @@ if(${BuildType} STREQUAL "server" OR ${BuildType} STREQUAL "all")
         sqlite3
     )
 
-    target_include_directories(Server PUBLIC 
+    target_include_directories(Server PUBLIC
         ${PROJECT_SOURCE_DIR}/src/common/
         ${PROJECT_SOURCE_DIR}/src/server/
     )
@@ -88,7 +88,7 @@ endif()
 
 # Client scripts
 if(${BuildType} STREQUAL "client" OR ${BuildType} STREQUAL "all")
-	add_executable (Client 
+	add_executable (Client
         src/client/Main.cpp
         src/client/Client.cpp
         src/client/Client.h
@@ -100,7 +100,7 @@ if(${BuildType} STREQUAL "client" OR ${BuildType} STREQUAL "all")
         OpenSSL::Crypto
     )
 
-    target_include_directories(Client PUBLIC 
+    target_include_directories(Client PUBLIC
         ${PROJECT_SOURCE_DIR}/src/common/
         ${PROJECT_SOURCE_DIR}/src/client/
     )
@@ -117,5 +117,3 @@ include(cmake/SelfSignedCertificates.cmake)
 
 # Database creation and loading
 include(cmake/Database.cmake)
-
-

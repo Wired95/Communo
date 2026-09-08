@@ -1,18 +1,18 @@
 #ifndef _SERVER_H_
 #define _SERVER_H_
 
-#include "SharedDefinitions.h"
-#include "NetworkHeaders.h"
-#include "Logging.h"
 #include "Chat.h"
+#include "Logging.h"
+#include "NetworkHeaders.h"
+#include "SharedDefinitions.h"
 
-#include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/ssl.h>
 
-#include <iostream>
-#include <cstdlib>
-#include <vector>
 #include <chrono>
+#include <cstdlib>
+#include <iostream>
+#include <vector>
 
 enum class eServerState
 {
@@ -24,16 +24,25 @@ enum class eServerState
 
 struct ClientSocket
 {
-    ClientSocket() : socket(0), sslEnabled(false), chatRoomJoined(false), joinedChatRoomID(0), clientID(0), clientUsername("<unk>")  {}
-    ClientSocket(int _socket) : socket(_socket), sslEnabled(false), chatRoomJoined(false), joinedChatRoomID(0), clientID(0), clientUsername("<unk>")  {}
+    ClientSocket()
+        : socket(0), sslEnabled(false), chatRoomJoined(false),
+          joinedChatRoomID(0), clientID(0), clientUsername("<unk>")
+    {
+    }
+    ClientSocket(int _socket)
+        : socket(_socket), sslEnabled(false), chatRoomJoined(false),
+          joinedChatRoomID(0), clientID(0), clientUsername("<unk>")
+    {
+    }
 
-    ClientSocket(const ClientSocket&) = delete;
-    ClientSocket& operator=(const ClientSocket&) = delete;
+    ClientSocket(const ClientSocket &) = delete;
+    ClientSocket &operator=(const ClientSocket &) = delete;
 
-    ClientSocket(ClientSocket&& other) noexcept;
-    ClientSocket& operator=(ClientSocket&& other) noexcept;
+    ClientSocket(ClientSocket &&other) noexcept;
+    ClientSocket &operator=(ClientSocket &&other) noexcept;
 
-    ~ClientSocket() {
+    ~ClientSocket()
+    {
         if (ssl)
         {
             SSL_free(ssl);
@@ -41,15 +50,16 @@ struct ClientSocket
         }
     }
 
-    bool InitSSL(SSL_CTX* ctx, int timeoutSeconds);
+    bool InitSSL(SSL_CTX *ctx, int timeoutSeconds);
 
-    void close() {
+    void close()
+    {
         ::shutdown(socket, SHUT_RDWR);
         ::close(socket);
     }
 
     int socket;
-    SSL* ssl;
+    SSL *ssl;
     bool sslEnabled = false;
 
     bool chatRoomJoined = false;
@@ -61,7 +71,7 @@ struct ClientSocket
 
 class Server
 {
-public:
+  public:
     Server();
     ~Server();
 
@@ -75,11 +85,12 @@ public:
 
     void SetSendHelloMessagesToNewClients(bool send);
 
-    void SendMsgToSocket(ClientSocket* client, const char* msg);
-    void SendMsgToSocket(ClientSocket* client, const std::string msg) {
+    void SendMsgToSocket(ClientSocket *client, const char *msg);
+    void SendMsgToSocket(ClientSocket *client, const std::string msg)
+    {
         SendMsgToSocket(client, msg.c_str());
     }
-    void SendMOTD(ClientSocket& socket);
+    void SendMOTD(ClientSocket &socket);
 
     void PoolActivity();
 
@@ -89,18 +100,20 @@ public:
 
     eServerState getServerState() { return m_ServerState; }
 
-    void ClosingRequested() {
+    void ClosingRequested()
+    {
         m_ServerState = eServerState::CLOSING;
 
         // Close all sockets
-        for (auto& itr : m_ClientSocket) {
+        for (auto &itr : m_ClientSocket)
+        {
             itr.close();
         }
     }
 
     void CloseServer() { m_ServerState = eServerState::CLOSED; }
 
-private:
+  private:
     struct timeval tv;
 
     std::chrono::steady_clock::time_point m_StartTime;
@@ -109,7 +122,7 @@ private:
     // Used to give each connected client an unique ID
     uint64_t m_UniqueCLientCounter;
 
-    char buffer[4096];  //data buffer of 4K  
+    char buffer[4096]; // data buffer of 4K
 
     int m_MasterSocket;
     struct sockaddr_in m_Adress;
@@ -119,36 +132,36 @@ private:
     eServerState m_ServerState;
 
     // SSL
-    SSL_CTX* m_ctx;
+    SSL_CTX *m_ctx;
 
     // Hello msg
     bool m_SendHelloMsg;
-    const char* m_HelloMsg = "Server v1.0 on duty! waiting for commands.";
-    void sendHelloMsg(ClientSocket& socket) {
-        SendMOTD(socket);
-    }
+    const char *m_HelloMsg = "Server v1.0 on duty! waiting for commands.";
+    void sendHelloMsg(ClientSocket &socket) { SendMOTD(socket); }
 
-    //set of socket descriptors  
+    // set of socket descriptors
     fd_set m_Readfds;
 
-    void SendSSLPacketToClientSocket(ClientSocket* client, 
-        std::string const &packet,
-        const std::string& opcodeFancyName =
-        "[SMSG_DEFAULT_OPCODE_NAME (undefined)]");
+    void
+    SendSSLPacketToClientSocket(ClientSocket *client, std::string const &packet,
+                                const std::string &opcodeFancyName =
+                                    "[SMSG_DEFAULT_OPCODE_NAME (undefined)]");
 
-    void CallHandler(ClientSocket* client, int payloadSize);
-    void CallHandlerEcho(ClientSocket* client, std::string reply);
-    void CallHandlerAdd(ClientSocket* client, size_t offset, int payloadSize);
+    void CallHandler(ClientSocket *client, int payloadSize);
+    void CallHandlerEcho(ClientSocket *client, std::string reply);
+    void CallHandlerAdd(ClientSocket *client, size_t offset, int payloadSize);
     void CallHandlerBroadcast(std::string const stream);
-    void CallHandlerGetClientList(ClientSocket* client);
-    void CallHandlerMsgToClient(ClientSocket* client, size_t offset, int payloadSize);
-    void CallHandlerPong(ClientSocket* client);
-    void CallHandlerUptime(ClientSocket* client);
-    void CallHandlerGetCounter(ClientSocket* client);
-    void CallHandlerGetChatRooms(ClientSocket* client);
-    void CallHandlerGetRoominfo(ClientSocket* client);
-    void CallHandlerJoinRoom(ClientSocket* client, size_t offset, int payloadSize);
-    void CallHandlerSay(ClientSocket* client, std::string message);
+    void CallHandlerGetClientList(ClientSocket *client);
+    void CallHandlerMsgToClient(ClientSocket *client, size_t offset,
+                                int payloadSize);
+    void CallHandlerPong(ClientSocket *client);
+    void CallHandlerUptime(ClientSocket *client);
+    void CallHandlerGetCounter(ClientSocket *client);
+    void CallHandlerGetChatRooms(ClientSocket *client);
+    void CallHandlerGetRoominfo(ClientSocket *client);
+    void CallHandlerJoinRoom(ClientSocket *client, size_t offset,
+                             int payloadSize);
+    void CallHandlerSay(ClientSocket *client, std::string message);
 };
 
 #endif // _SERVER_H_

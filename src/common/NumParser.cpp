@@ -1,36 +1,36 @@
 #include "NumParser.h"
 
-#include <cstring>
 #include <cstdint>
+#include <cstring>
 #include <stdexcept>
 
 // Integer parsing
-template<typename T>
-bool parse_integer(std::string_view s, T& value, int base = 10)
+template <typename T>
+bool parse_integer(std::string_view s, T &value, int base = 10)
 {
     static_assert(std::is_integral_v<T>);
 
-    const char* begin = s.data();
-    const char* end   = s.data() + s.size();
+    const char *begin = s.data();
+    const char *end = s.data() + s.size();
 
     auto result = std::from_chars(begin, end, value, base);
 
-    return result.ec == std::errc{} &&
-           result.ptr == end;
+    return result.ec == std::errc{} && result.ptr == end;
 }
 
 // Floating-point parsing
-template<typename T>
-bool parse_float(std::string_view s, T& value)
+template <typename T> bool parse_float(std::string_view s, T &value)
 {
     std::string tmp(s);
 
-    char* end = nullptr;
+    char *end = nullptr;
 
-    if constexpr (std::is_same_v<T, float>) {
+    if constexpr (std::is_same_v<T, float>)
+    {
         value = std::strtof(tmp.c_str(), &end);
     }
-    else {
+    else
+    {
         value = std::strtod(tmp.c_str(), &end);
     }
 
@@ -38,18 +38,16 @@ bool parse_float(std::string_view s, T& value)
 }
 
 // Display a Number as a string
-std::string number_to_string(const Number& number)
+std::string number_to_string(const Number &number)
 {
-    return std::visit([](auto value) {
-        return std::to_string(value);
-    }, number);
+    return std::visit([](auto value) { return std::to_string(value); }, number);
 }
 
 // Integer suffix removal
-std::pair<std::string_view, IntegerSuffix>
-remove_suffix(std::string_view s)
+std::pair<std::string_view, IntegerSuffix> remove_suffix(std::string_view s)
 {
-    auto ends_with = [&](std::string_view suffix) {
+    auto ends_with = [&](std::string_view suffix)
+    {
         return s.size() >= suffix.size() &&
                s.substr(s.size() - suffix.size()) == suffix;
     };
@@ -74,7 +72,6 @@ remove_suffix(std::string_view s)
     return {s, IntegerSuffix::None};
 }
 
-
 // Parse integer according to suffix
 Number parse_integer_number(std::string_view input)
 {
@@ -86,9 +83,8 @@ Number parse_integer_number(std::string_view input)
     // Determine base.
     int base = 10;
 
-    if (s.size() >= 2 &&
-        s[0] == '0' &&
-        (s[1] == 'x' || s[1] == 'X')) {
+    if (s.size() >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
+    {
         base = 16;
         s.remove_prefix(2);
 
@@ -99,8 +95,7 @@ Number parse_integer_number(std::string_view input)
     }
 
     // Explicit unsigned suffix
-    if (suffix == IntegerSuffix::U ||
-        suffix == IntegerSuffix::UL ||
+    if (suffix == IntegerSuffix::U || suffix == IntegerSuffix::UL ||
         suffix == IntegerSuffix::ULL)
     {
         uint64_t value{};
@@ -182,24 +177,19 @@ Number parse_integer_number(std::string_view input)
     if (value <= std::numeric_limits<uint32_t>::max())
         return static_cast<uint32_t>(value);
 
-    if (value <= static_cast<uint64_t>(
-                     std::numeric_limits<int16_t>::max()))
+    if (value <= static_cast<uint64_t>(std::numeric_limits<int16_t>::max()))
         return static_cast<int16_t>(value);
 
-    if (value <= static_cast<uint64_t>(
-                     std::numeric_limits<uint16_t>::max()))
+    if (value <= static_cast<uint64_t>(std::numeric_limits<uint16_t>::max()))
         return static_cast<uint16_t>(value);
 
-    if (value <= static_cast<uint64_t>(
-                     std::numeric_limits<int32_t>::max()))
+    if (value <= static_cast<uint64_t>(std::numeric_limits<int32_t>::max()))
         return static_cast<int32_t>(value);
 
-    if (value <= static_cast<uint64_t>(
-                     std::numeric_limits<uint32_t>::max()))
+    if (value <= static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()))
         return static_cast<uint32_t>(value);
 
-    if (value <= static_cast<uint64_t>(
-                     std::numeric_limits<int64_t>::max()))
+    if (value <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
         return static_cast<int64_t>(value);
 
     return value;
@@ -223,10 +213,9 @@ Number parse_number(std::string_view s)
     }
 
     // Detect floating-point notation.
-    bool is_float =
-        s.find('.') != std::string_view::npos ||
-        s.find('e') != std::string_view::npos ||
-        s.find('E') != std::string_view::npos;
+    bool is_float = s.find('.') != std::string_view::npos ||
+                    s.find('e') != std::string_view::npos ||
+                    s.find('E') != std::string_view::npos;
 
     if (is_float)
     {
@@ -241,192 +230,192 @@ Number parse_number(std::string_view s)
     return parse_integer_number(s);
 }
 
-void print_number(const Number& number)
+void print_number(const Number &number)
 {
-    std::visit([](auto value)
-    {
-        using T = decltype(value);
+    std::visit(
+        [](auto value)
+        {
+            using T = decltype(value);
 
-        if constexpr (std::is_same_v<T, int8_t>)
-            std::cout << "int8_t: " << +value << '\n';
+            if constexpr (std::is_same_v<T, int8_t>)
+                std::cout << "int8_t: " << +value << '\n';
 
-        else if constexpr (std::is_same_v<T, uint8_t>)
-            std::cout << "uint8_t: " << +value << '\n';
+            else if constexpr (std::is_same_v<T, uint8_t>)
+                std::cout << "uint8_t: " << +value << '\n';
 
-        else if constexpr (std::is_same_v<T, int16_t>)
-            std::cout << "int16_t: " << value << '\n';
+            else if constexpr (std::is_same_v<T, int16_t>)
+                std::cout << "int16_t: " << value << '\n';
 
-        else if constexpr (std::is_same_v<T, uint16_t>)
-            std::cout << "uint16_t: " << value << '\n';
+            else if constexpr (std::is_same_v<T, uint16_t>)
+                std::cout << "uint16_t: " << value << '\n';
 
-        else if constexpr (std::is_same_v<T, int32_t>)
-            std::cout << "int32_t: " << value << '\n';
+            else if constexpr (std::is_same_v<T, int32_t>)
+                std::cout << "int32_t: " << value << '\n';
 
-        else if constexpr (std::is_same_v<T, uint32_t>)
-            std::cout << "uint32_t: " << value << '\n';
+            else if constexpr (std::is_same_v<T, uint32_t>)
+                std::cout << "uint32_t: " << value << '\n';
 
-        else if constexpr (std::is_same_v<T, int64_t>)
-            std::cout << "int64_t: " << value << '\n';
+            else if constexpr (std::is_same_v<T, int64_t>)
+                std::cout << "int64_t: " << value << '\n';
 
-        else if constexpr (std::is_same_v<T, uint64_t>)
-            std::cout << "uint64_t: " << value << '\n';
+            else if constexpr (std::is_same_v<T, uint64_t>)
+                std::cout << "uint64_t: " << value << '\n';
 
-        else if constexpr (std::is_same_v<T, float>)
-            std::cout << "float: " << value << '\n';
+            else if constexpr (std::is_same_v<T, float>)
+                std::cout << "float: " << value << '\n';
 
-        else if constexpr (std::is_same_v<T, double>)
-            std::cout << "double: " << value << '\n';
-
-    }, number);
+            else if constexpr (std::is_same_v<T, double>)
+                std::cout << "double: " << value << '\n';
+        },
+        number);
 }
 
-eNumberTypes get_number_type(const Number& number)
+eNumberTypes get_number_type(const Number &number)
 {
     eNumberTypes encodedType = N_UNK;
 
-    std::visit([&encodedType](auto value)
-    {
-        using T = decltype(value);
+    std::visit(
+        [&encodedType](auto value)
+        {
+            using T = decltype(value);
 
-        if constexpr (std::is_same_v<T, int8_t>)
-            encodedType = N_INT8;
-        else if constexpr (std::is_same_v<T, uint8_t>)
-            encodedType = N_UINT8;
-        else if constexpr (std::is_same_v<T, int16_t>)
-            encodedType = N_INT16;
-        else if constexpr (std::is_same_v<T, uint16_t>)
-            encodedType = N_UINT16;
-        else if constexpr (std::is_same_v<T, int32_t>)
-            encodedType = N_INT32;
-        else if constexpr (std::is_same_v<T, uint32_t>)
-            encodedType = N_UINT32;
-        else if constexpr (std::is_same_v<T, int64_t>)
-            encodedType = N_INT64;
-        else if constexpr (std::is_same_v<T, uint64_t>)
-            encodedType = N_UINT64;
-        else if constexpr (std::is_same_v<T, float>)
-            encodedType = N_FLOAT;
-        else if constexpr (std::is_same_v<T, double>)
-            encodedType = N_DOUBLE;
-
-    }, number);
+            if constexpr (std::is_same_v<T, int8_t>)
+                encodedType = N_INT8;
+            else if constexpr (std::is_same_v<T, uint8_t>)
+                encodedType = N_UINT8;
+            else if constexpr (std::is_same_v<T, int16_t>)
+                encodedType = N_INT16;
+            else if constexpr (std::is_same_v<T, uint16_t>)
+                encodedType = N_UINT16;
+            else if constexpr (std::is_same_v<T, int32_t>)
+                encodedType = N_INT32;
+            else if constexpr (std::is_same_v<T, uint32_t>)
+                encodedType = N_UINT32;
+            else if constexpr (std::is_same_v<T, int64_t>)
+                encodedType = N_INT64;
+            else if constexpr (std::is_same_v<T, uint64_t>)
+                encodedType = N_UINT64;
+            else if constexpr (std::is_same_v<T, float>)
+                encodedType = N_FLOAT;
+            else if constexpr (std::is_same_v<T, double>)
+                encodedType = N_DOUBLE;
+        },
+        number);
 
     return encodedType;
 }
 
 // Append the right amount of Bytes required by the number type to a string
-void append_number(std::string& replyStr, const Number& number)
+void append_number(std::string &replyStr, const Number &number)
 {
-    std::visit([&](auto value)
-    {
-        using T = decltype(value);
+    std::visit(
+        [&](auto value)
+        {
+            using T = decltype(value);
 
-        replyStr.append(
-            reinterpret_cast<const char*>(&value),
-            sizeof(T)
-        );
-
-    }, number);
+            replyStr.append(reinterpret_cast<const char *>(&value), sizeof(T));
+        },
+        number);
 }
 
-Number read_number(const char* buffer, size_t& offset, eNumberTypes type)
+Number read_number(const char *buffer, size_t &offset, eNumberTypes type)
 {
     switch (type)
     {
-        case N_INT8:
-        {
-            int8_t value;
-            std::memcpy(&value, buffer + offset, sizeof(value));
-            offset += sizeof(value);
-            return value;
-        }
+    case N_INT8:
+    {
+        int8_t value;
+        std::memcpy(&value, buffer + offset, sizeof(value));
+        offset += sizeof(value);
+        return value;
+    }
 
-        case N_UINT8:
-        {
-            uint8_t value;
-            std::memcpy(&value, buffer + offset, sizeof(value));
-            offset += sizeof(value);
-            return value;
-        }
+    case N_UINT8:
+    {
+        uint8_t value;
+        std::memcpy(&value, buffer + offset, sizeof(value));
+        offset += sizeof(value);
+        return value;
+    }
 
-        case N_INT16:
-        {
-            int16_t value;
-            std::memcpy(&value, buffer + offset, sizeof(value));
-            offset += sizeof(value);
-            return value;
-        }
+    case N_INT16:
+    {
+        int16_t value;
+        std::memcpy(&value, buffer + offset, sizeof(value));
+        offset += sizeof(value);
+        return value;
+    }
 
-        case N_UINT16:
-        {
-            uint16_t value;
-            std::memcpy(&value, buffer + offset, sizeof(value));
-            offset += sizeof(value);
-            return value;
-        }
+    case N_UINT16:
+    {
+        uint16_t value;
+        std::memcpy(&value, buffer + offset, sizeof(value));
+        offset += sizeof(value);
+        return value;
+    }
 
-        case N_INT32:
-        {
-            int32_t value;
-            std::memcpy(&value, buffer + offset, sizeof(value));
-            offset += sizeof(value);
-            return value;
-        }
+    case N_INT32:
+    {
+        int32_t value;
+        std::memcpy(&value, buffer + offset, sizeof(value));
+        offset += sizeof(value);
+        return value;
+    }
 
-        case N_UINT32:
-        {
-            uint32_t value;
-            std::memcpy(&value, buffer + offset, sizeof(value));
-            offset += sizeof(value);
-            return value;
-        }
+    case N_UINT32:
+    {
+        uint32_t value;
+        std::memcpy(&value, buffer + offset, sizeof(value));
+        offset += sizeof(value);
+        return value;
+    }
 
-        case N_INT64:
-        {
-            int64_t value;
-            std::memcpy(&value, buffer + offset, sizeof(value));
-            offset += sizeof(value);
-            return value;
-        }
+    case N_INT64:
+    {
+        int64_t value;
+        std::memcpy(&value, buffer + offset, sizeof(value));
+        offset += sizeof(value);
+        return value;
+    }
 
-        case N_UINT64:
-        {
-            uint64_t value;
-            std::memcpy(&value, buffer + offset, sizeof(value));
-            offset += sizeof(value);
-            return value;
-        }
+    case N_UINT64:
+    {
+        uint64_t value;
+        std::memcpy(&value, buffer + offset, sizeof(value));
+        offset += sizeof(value);
+        return value;
+    }
 
-        case N_FLOAT:
-        {
-            float value;
-            std::memcpy(&value, buffer + offset, sizeof(value));
-            offset += sizeof(value);
-            return value;
-        }
+    case N_FLOAT:
+    {
+        float value;
+        std::memcpy(&value, buffer + offset, sizeof(value));
+        offset += sizeof(value);
+        return value;
+    }
 
-        case N_DOUBLE:
-        {
-            double value;
-            std::memcpy(&value, buffer + offset, sizeof(value));
-            offset += sizeof(value);
-            return value;
-        }
+    case N_DOUBLE:
+    {
+        double value;
+        std::memcpy(&value, buffer + offset, sizeof(value));
+        offset += sizeof(value);
+        return value;
+    }
 
-        default:
-            throw std::runtime_error("Unknown number type");
+    default:
+        throw std::runtime_error("Unknown number type");
     }
 }
 
-bool is_unsigned_integer(const Number& n)
+bool is_unsigned_integer(const Number &n)
 {
-    return std::visit([](auto value) {
-        using T = decltype(value);
-        return std::is_integral_v<T> && std::is_unsigned_v<T>;
-    }, n);
+    return std::visit(
+        [](auto value)
+        {
+            using T = decltype(value);
+            return std::is_integral_v<T> && std::is_unsigned_v<T>;
+        },
+        n);
 }
 
-bool is_uint8_t(const Number& n)
-{
-    return std::holds_alternative<uint8_t>(n);
-}
+bool is_uint8_t(const Number &n) { return std::holds_alternative<uint8_t>(n); }

@@ -1,15 +1,15 @@
 #ifndef _CLIENT_H_
 #define _CLIENT_H_
 
-#include "SharedDefinitions.h"
 #include "NetworkHeaders.h"
 #include "NumParser.h"
+#include "SharedDefinitions.h"
 
-#include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/ssl.h>
 
-#include <vector>
 #include <chrono>
+#include <vector>
 
 #ifdef _WIN32
 
@@ -20,9 +20,9 @@
 
 #else
 
-#include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #define SOCKET int
@@ -37,7 +37,7 @@
 
 class Client
 {
-public:
+  public:
     Client() : m_Sock(0) {}
     ~Client();
 
@@ -47,7 +47,7 @@ public:
 
     void processReplyFromServerIfAny();
 
-    void sendSSLPacketToServer(const std::string& packet);
+    void sendSSLPacketToServer(const std::string &packet);
     void sendSSLOpcodeToServer(const uint16_t opcode);
     void sendEchoRequest(std::string msg);
     void sendAdditionRequest(const std::vector<Number> numbers);
@@ -63,10 +63,10 @@ public:
     void sendJoinRoomRequest(uint8_t roomID, std::string password);
     void sendChatSay(std::string const msg);
 
-private:
+  private:
     unsigned long long m_Sock;
-    SSL_CTX* m_ctx;
-    SSL* m_ssl;
+    SSL_CTX *m_ctx;
+    SSL *m_ssl;
 
     std::chrono::steady_clock::time_point m_pingStart;
 };
