@@ -20,8 +20,8 @@
 
 /// 3. SSL Settings
 
-inline constexpr const char *tls_ca_file = TLS_CA_FILE;
-inline constexpr const char *tls_key_file = TLS_KEY_FILE;
+inline constexpr const char *tls_ca_file   = TLS_CA_FILE;
+inline constexpr const char *tls_key_file  = TLS_KEY_FILE;
 inline constexpr const char *tls_cert_file = TLS_CERT_FILE;
 
 /// 4. Chat settings
@@ -39,6 +39,10 @@ enum eChatErr : uint8_t
     ERR_MSG_TO_SELF,
     ERR_TOO_MUCH_CLIENTS,
     ERR_EMPTY_MESSAGE,
+    ERR_USERNAME_TOO_LONG,
+    ERR_USERNAME_INVALID_CHAR,
 };
+
+#define MAX_USERNAME_LENGTH 32
 
 #endif // _SHAREDDEFS_H_
