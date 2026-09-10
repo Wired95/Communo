@@ -674,6 +674,18 @@ void Client::sendClientMessage(uint64_t clientID, std::string msg)
     sendSSLPacketToServer(packet);
 }
 
+void Client::sendChangeUsername(std::string const msg)
+{
+    std::string packet;
+
+    uint16_t opcode = htons(CMSG_CHANGE_USERNAME);
+    packet.append(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
+
+    packet += msg;
+
+    sendSSLPacketToServer(packet);
+}
+
 void Client::sendGetChatRooms() { sendSSLOpcodeToServer(CMSG_GET_CHAT_ROOMS); }
 
 void Client::sendGetRoomInfo() { sendSSLOpcodeToServer(CMSG_GET_ROOM_INFO); }

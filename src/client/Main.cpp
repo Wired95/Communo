@@ -225,8 +225,14 @@ int main(int argc, char const *argv[])
                    { client.sendGetClients(); });
 
     cli.addCommand("client set-username",
-                   [&client](const std::vector<std::string> &)
-                   { std::cout << "client set-username\n"; });
+                   [&client](const std::vector<std::string> &args)
+                   {
+                       if (args.size() != 1)
+                           throw std::runtime_error(
+                               "usage: client set-username <username>");
+
+                       client.sendChangeUsername(args[0]);
+                   });
 
     cli.addCommand(
         "client send-msg",
@@ -336,6 +342,7 @@ int main(int argc, char const *argv[])
                                  << "  ping\n"
                                  << "  uptime\n"
                                  << "  counter ..\n"
+                                 << "  client ..\n"
                                  << "  chat ..\n"
                                  << "  help\n"
                                  << "  exit\n";

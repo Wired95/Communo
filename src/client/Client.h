@@ -58,6 +58,7 @@ class Client
     void sendGetCounter();
     void sendGetClients();
     void sendClientMessage(uint64_t clientID, std::string msg);
+    void sendChangeUsername(std::string const msg);
     void sendGetChatRooms();
     void sendGetRoomInfo();
     void sendJoinRoomRequest(uint8_t roomID, std::string password);

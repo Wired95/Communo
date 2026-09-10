@@ -75,6 +75,10 @@ Available commands:
   counter ..
     increment
     get
+  client ..
+    get-clients
+    set-username <username>
+    send-msg <clientID> <msg>
   chat ..
     get-rooms
     info
