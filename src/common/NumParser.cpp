@@ -11,9 +11,9 @@ bool parse_integer(std::string_view s, T &value, int base = 10)
     static_assert(std::is_integral_v<T>);
 
     const char *begin = s.data();
-    const char *end = s.data() + s.size();
+    const char *end   = s.data() + s.size();
 
-    auto result = std::from_chars(begin, end, value, base);
+    auto result       = std::from_chars(begin, end, value, base);
 
     return result.ec == std::errc{} && result.ptr == end;
 }
@@ -78,10 +78,10 @@ Number parse_integer_number(std::string_view input)
     auto [s, suffix] = remove_suffix(input);
 
     // Detect sign.
-    bool negative = !s.empty() && s.front() == '-';
+    bool negative    = !s.empty() && s.front() == '-';
 
     // Determine base.
-    int base = 10;
+    int base         = 10;
 
     if (s.size() >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
     {

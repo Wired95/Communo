@@ -4,8 +4,8 @@
 
 void Database::loadRooms(std::unordered_map<uint8_t, ChatRoom> &chatRooms)
 {
-    const char *sql = "SELECT id, name, password_hash "
-                      "FROM chat_rooms;";
+    const char *sql    = "SELECT id, name, password_hash "
+                         "FROM chat_rooms;";
 
     sqlite3_stmt *stmt = nullptr;
 
@@ -28,7 +28,7 @@ void Database::loadRooms(std::unordered_map<uint8_t, ChatRoom> &chatRooms)
             reinterpret_cast<const char *>(sqlite3_column_text(stmt, 2));
 
         ChatRoom room;
-        room.name = name ? name : "";
+        room.name         = name ? name : "";
         room.passwordHash = passwordHash ? passwordHash : "";
 
         chatRooms.emplace(roomID, std::move(room));

@@ -56,7 +56,7 @@ bool Client::initClientConnection()
     }
 
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
+    serv_addr.sin_port   = htons(PORT);
 
     // Convert IPv4 and IPv6 addresses from text to binary form
     if (inet_pton(AF_INET, SERVER_IP, &serv_addr.sin_addr) <= 0)
@@ -201,9 +201,9 @@ void Client::processReplyFromServerIfAny()
     char buffer[4096] = {0};
 
     struct pollfd pfd;
-    pfd.fd = static_cast<int>(m_Sock);
-    pfd.events = POLLIN;
-    pfd.revents = 0;
+    pfd.fd         = static_cast<int>(m_Sock);
+    pfd.events     = POLLIN;
+    pfd.revents    = 0;
 
     // Don't block: just check whether data is available.
     int pollResult = poll(&pfd, 1, 0);

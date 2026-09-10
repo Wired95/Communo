@@ -35,7 +35,7 @@ struct ClientSocket
     {
     }
 
-    ClientSocket(const ClientSocket &) = delete;
+    ClientSocket(const ClientSocket &)            = delete;
     ClientSocket &operator=(const ClientSocket &) = delete;
 
     ClientSocket(ClientSocket &&other) noexcept;
@@ -60,7 +60,7 @@ struct ClientSocket
 
     int socket;
     SSL *ssl;
-    bool sslEnabled = false;
+    bool sslEnabled     = false;
 
     bool chatRoomJoined = false;
     uint8_t joinedChatRoomID;

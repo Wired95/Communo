@@ -32,7 +32,7 @@ class Database
             sqlite3_close(m_db);
     }
 
-    Database(const Database &) = delete;
+    Database(const Database &)            = delete;
     Database &operator=(const Database &) = delete;
 
     void loadRooms(std::unordered_map<uint8_t, ChatRoom> &chatRooms);

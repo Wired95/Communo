@@ -81,7 +81,7 @@ bool ClientSocket::InitSSL(SSL_CTX *ctx, int timeoutSeconds)
         {
             ERR_print_errors_fp(stderr);
             SSL_free(ssl);
-            ssl = nullptr;
+            ssl        = nullptr;
             sslEnabled = false;
             return false;
         }
@@ -93,7 +93,7 @@ bool ClientSocket::InitSSL(SSL_CTX *ctx, int timeoutSeconds)
             sLog.log(LOG_FLAG_DEBUG, "SSL handshake timed out.");
 
             SSL_free(ssl);
-            ssl = nullptr;
+            ssl        = nullptr;
             sslEnabled = false;
             return false;
         }
@@ -103,7 +103,7 @@ bool ClientSocket::InitSSL(SSL_CTX *ctx, int timeoutSeconds)
                              .count();
 
         struct pollfd pfd{};
-        pfd.fd = socket;
+        pfd.fd     = socket;
         pfd.events = (error == SSL_ERROR_WANT_READ) ? POLLIN : POLLOUT;
 
         int result = poll(&pfd, 1, static_cast<int>(remaining));
@@ -113,7 +113,7 @@ bool ClientSocket::InitSSL(SSL_CTX *ctx, int timeoutSeconds)
             sLog.log(LOG_FLAG_DEBUG, "SSL handshake timed out.");
 
             SSL_free(ssl);
-            ssl = nullptr;
+            ssl        = nullptr;
             sslEnabled = false;
             return false;
         }
@@ -126,7 +126,7 @@ bool ClientSocket::InitSSL(SSL_CTX *ctx, int timeoutSeconds)
             perror("poll");
 
             SSL_free(ssl);
-            ssl = nullptr;
+            ssl        = nullptr;
             sslEnabled = false;
             return false;
         }
@@ -136,7 +136,7 @@ bool ClientSocket::InitSSL(SSL_CTX *ctx, int timeoutSeconds)
             sLog.log(LOG_FLAG_DEBUG, "Socket error during SSL handshake.");
 
             SSL_free(ssl);
-            ssl = nullptr;
+            ssl        = nullptr;
             sslEnabled = false;
             return false;
         }
@@ -150,13 +150,13 @@ ClientSocket::ClientSocket(ClientSocket &&other) noexcept
       clientUsername(other.clientUsername)
 {
     // belts and buckles
-    other.socket = INVALID_SOCKET;
-    other.ssl = nullptr;
-    other.sslEnabled = false;
-    other.chatRoomJoined = false;
+    other.socket           = INVALID_SOCKET;
+    other.ssl              = nullptr;
+    other.sslEnabled       = false;
+    other.chatRoomJoined   = false;
     other.joinedChatRoomID = 0;
-    other.clientID = 0;
-    other.clientUsername = "<unk>";
+    other.clientID         = 0;
+    other.clientUsername   = "<unk>";
 }
 
 ClientSocket &ClientSocket::operator=(ClientSocket &&other) noexcept
@@ -173,21 +173,21 @@ ClientSocket &ClientSocket::operator=(ClientSocket &&other) noexcept
             ::close(socket);
         }
 
-        socket = other.socket;
-        ssl = other.ssl;
-        sslEnabled = other.sslEnabled;
-        chatRoomJoined = other.chatRoomJoined;
-        joinedChatRoomID = other.joinedChatRoomID;
-        clientID = other.clientID;
-        clientUsername = other.clientUsername;
+        socket                 = other.socket;
+        ssl                    = other.ssl;
+        sslEnabled             = other.sslEnabled;
+        chatRoomJoined         = other.chatRoomJoined;
+        joinedChatRoomID       = other.joinedChatRoomID;
+        clientID               = other.clientID;
+        clientUsername         = other.clientUsername;
 
-        other.socket = INVALID_SOCKET;
-        other.ssl = nullptr;
-        other.sslEnabled = false;
-        other.chatRoomJoined = false;
+        other.socket           = INVALID_SOCKET;
+        other.ssl              = nullptr;
+        other.sslEnabled       = false;
+        other.chatRoomJoined   = false;
         other.joinedChatRoomID = 0;
-        other.clientID = 0;
-        other.clientUsername = "<unk>";
+        other.clientID         = 0;
+        other.clientUsername   = "<unk>";
     }
 
     return *this;
@@ -196,21 +196,21 @@ ClientSocket &ClientSocket::operator=(ClientSocket &&other) noexcept
 Server::Server()
 {
     // For connection pooling
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
+    tv.tv_sec                = 0;
+    tv.tv_usec               = 0;
 
-    m_SendHelloMsg = false;
+    m_SendHelloMsg           = false;
 
     // type of socket created
-    m_Adress.sin_family = AF_INET;
+    m_Adress.sin_family      = AF_INET;
     m_Adress.sin_addr.s_addr = INADDR_ANY;
-    m_Adress.sin_port = htons(PORT);
+    m_Adress.sin_port        = htons(PORT);
 
-    m_AddrLen = sizeof(m_Adress);
+    m_AddrLen                = sizeof(m_Adress);
 
-    m_ServerState = eServerState::NOT_STARTED;
+    m_ServerState            = eServerState::NOT_STARTED;
 
-    m_UniqueCLientCounter = 0;
+    m_UniqueCLientCounter    = 0;
 }
 
 Server::~Server()
@@ -532,8 +532,8 @@ void Server::ProcessRequests()
             {
                 std::string reply = "Invalid packet.";
 
-                int sent = SSL_write(it->ssl, reply.data(),
-                                     static_cast<int>(reply.size()));
+                int sent          = SSL_write(it->ssl, reply.data(),
+                                              static_cast<int>(reply.size()));
 
                 if (sent <= 0)
                 {
@@ -606,7 +606,7 @@ void Server::CallHandler(ClientSocket *client, int payloadSize)
         connLog << OPCODE_STR(CMSG_ADDITION_REQUEST);
 
         // check minimal required packet size
-        offset = sizeof(opcode);
+        offset  = sizeof(opcode);
         //        opcode + 2 number types           + smallest numbers (2)
         minSize = offset + sizeof(eNumberTypes) * 2 + sizeof(uint8_t) * 2;
 
@@ -643,7 +643,7 @@ void Server::CallHandler(ClientSocket *client, int payloadSize)
         connLog << OPCODE_STR(CMSG_SEND_MSG_TO_CLIENT);
 
         // check minimal required packet size
-        offset = sizeof(opcode);
+        offset  = sizeof(opcode);
         //        opcode + Client ID
         minSize = offset + sizeof(uint64_t);
 
@@ -695,7 +695,7 @@ void Server::CallHandler(ClientSocket *client, int payloadSize)
         break;
     case CMSG_JOIN_ROOM:
     {
-        offset = sizeof(opcode);
+        offset              = sizeof(opcode);
 
         size_t requiredSize = offset + sizeof(uint8_t) + SHA256_DIGEST_LENGTH;
 
@@ -818,7 +818,7 @@ void Server::CallHandlerGetClientList(ClientSocket *client)
     //   [uint8  username bytes]
     std::string packet, clientList;
 
-    uint8_t error = ERR_OK;
+    uint8_t error              = ERR_OK;
     unsigned short int ropcode = htons(SMSG_CLIENT_LIST);
     packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
 
@@ -869,8 +869,8 @@ void Server::CallHandlerMsgToClient(ClientSocket *client, size_t offset,
                                     int payloadSize)
 {
     std::string packet, message;
-    uint8_t error = ERR_OK;
-    uint64_t clientID = 0;
+    uint8_t error             = ERR_OK;
+    uint64_t clientID         = 0;
     ClientSocket *foundClient = nullptr;
 
     // Get Client ID
@@ -916,7 +916,7 @@ void Server::CallHandlerMsgToClient(ClientSocket *client, size_t offset,
     if (error == ERR_OK)
     {
         // Reset packet
-        packet = "";
+        packet  = "";
 
         // Prepare message
         ropcode = htons(SMSG_PRIVATE_MESSAGE);
@@ -1010,7 +1010,7 @@ void Server::CallHandlerJoinRoom(ClientSocket *client, size_t offset,
                                  int payloadSize)
 {
     std::string packet;
-    uint8_t error = ERR_OK;
+    uint8_t error  = ERR_OK;
     uint8_t roomID = static_cast<uint8_t>(buffer[offset++]);
     unsigned char hash[SHA256_DIGEST_LENGTH];
 
@@ -1027,8 +1027,8 @@ void Server::CallHandlerJoinRoom(ClientSocket *client, size_t offset,
 
     if (error == ERR_OK)
     {
-        client->joinedChatRoomID = roomID;
-        client->chatRoomJoined = true;
+        client->joinedChatRoomID   = roomID;
+        client->chatRoomJoined     = true;
 
         unsigned short int ropcode = htons(SMSG_JOIN_CHAT_ROOM_OK);
         packet.append(reinterpret_cast<const char *>(&ropcode),
@@ -1055,7 +1055,7 @@ void Server::CallHandlerJoinRoom(ClientSocket *client, size_t offset,
 void Server::CallHandlerSay(ClientSocket *client, std::string message)
 {
     std::string packet = "";
-    uint8_t roomID = client->joinedChatRoomID;
+    uint8_t roomID     = client->joinedChatRoomID;
     unsigned short int ropcode;
 
     if (sChat.checkRoomID(roomID) && client->chatRoomJoined)
@@ -1067,7 +1067,7 @@ void Server::CallHandlerSay(ClientSocket *client, std::string message)
         SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_SAY_OK));
 
         // prepare message packet
-        packet = "";
+        packet  = "";
         ropcode = htons(SMSG_SAY);
         packet.append(reinterpret_cast<const char *>(&ropcode),
                       sizeof(ropcode));
