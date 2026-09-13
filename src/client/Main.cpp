@@ -17,6 +17,7 @@
 
 #include "Client.h"
 #include "DebugUtils.h"
+#include "FileUtils.h"
 #include "OpCodes.h"
 
 std::atomic<bool> g_Running{true};
@@ -330,6 +331,30 @@ int main(int argc, char const *argv[])
 
                        client.sendChatSay(msg);
                    });
+
+    // file commands
+    cli.addCommand("file",
+                   [](const std::vector<std::string> &)
+                   {
+                       std::cout << "Available commands for file:\n"
+                                 << "  ls\n"
+                                 << "  ls-remote\n"
+                                 << "  get <filename>\n"
+                                 << "  put <filename>\n";
+                   });
+
+    cli.addCommand("file ls", [](const std::vector<std::string> &args)
+                   { print_files(get_files_in_dir(fm_local_dir)); });
+
+    cli.addCommand("file ls-remote",
+                   [&client](const std::vector<std::string> &args)
+                   { client.sendListRemoteFile(); });
+
+    cli.addCommand("file get", [&client](const std::vector<std::string> &args)
+                   { std::cout << "file get\n"; });
+
+    cli.addCommand("file put", [&client](const std::vector<std::string> &args)
+                   { std::cout << "file put\n"; });
 
     // help
     cli.addCommand("help",

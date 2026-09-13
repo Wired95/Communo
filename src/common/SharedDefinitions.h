@@ -6,6 +6,7 @@
  * 2. Server daemon settings
  * 3. SSL Settings
  * 4. Chat settings
+ * 5. File management settings
  */
 
 /// 1. Network configuration
@@ -44,5 +45,17 @@ enum eChatErr : uint8_t
 };
 
 #define MAX_USERNAME_LENGTH 32
+
+/// 5. File management settings
+
+inline constexpr const char *fm_local_dir  = FM_LOCAL_DIR;
+inline constexpr const char *fm_remote_dir = FM_REMOTE_DIR;
+
+enum eFileManagerErr : uint8_t
+{
+    FMERR_OK,
+    FMERR_TOO_MUCH_FILES,
+    FMERR_FILENAME_TOO_LONG,
+};
 
 #endif // _SHAREDDEFS_H_

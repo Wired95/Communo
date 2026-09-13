@@ -29,7 +29,7 @@ enum eOpcodes : uint16_t
 
     CMSG_GET_CLIENT_LIST     = 0x0004,
     CMSG_SEND_MSG_TO_CLIENT  = 0x0005,
-    CMSG_CHANGE_USERNAME     = 0x0006,
+    CMSG_CHANGE_USERNAME     = 0x0006, // todo (server-side)
 
     CMSG_UPTIME              = 0x0007,
     CMSG_PING                = 0x0008,
@@ -41,6 +41,10 @@ enum eOpcodes : uint16_t
     CMSG_GET_ROOM_INFO       = 0x000C,
     CMSG_JOIN_ROOM           = 0x000D,
     CMSG_SAY                 = 0x000E,
+
+    CMSG_LS_REMOTE           = 0x000F,
+    CMSG_UPLOAD_FILE         = 0x0010, // todo
+    CMSG_DOWNLOAD_FILE       = 0x0010, // todo
 
     // Server messages
     SMSG_MOTD                = 0x0FFF,
@@ -67,6 +71,10 @@ enum eOpcodes : uint16_t
     SMSG_SAY_OK              = 0x100D,
     SMSG_SAY_ERR             = 0x100E,
     SMSG_SAY                 = 0x100F,
+
+    SMSG_LS_REMOTE           = 0x1010,
+    SMSG_UPLOAD_ERR          = 0x1011, // todo
+    SMSG_DOWNLOAD            = 0x1012, // todo
 
     OPCODE_MAX               = (0x7FFF + 1),
 };

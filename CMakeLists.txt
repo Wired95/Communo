@@ -43,6 +43,8 @@ set_property(CACHE BuildType PROPERTY STRINGS server client all)
 add_library(Common STATIC
     src/common/DebugUtils.cpp
     src/common/DebugUtils.h
+    src/common/FileUtils.cpp
+    src/common/FileUtils.h
     src/common/NetworkHeaders.h
     src/common/SharedDefinitions.h
     src/common/OpCodes.h
@@ -117,3 +119,6 @@ include(cmake/SelfSignedCertificates.cmake)
 
 # Database creation and loading
 include(cmake/Database.cmake)
+
+# Datasets for the file manager
+include(cmake/FileManager.cmake)

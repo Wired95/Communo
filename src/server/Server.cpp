@@ -13,6 +13,7 @@
 
 #include "Chat.h"
 #include "DebugUtils.h"
+#include "FileUtils.h"
 #include "NumParser.h"
 #include "OpCodes.h"
 #include "Server.h"
@@ -723,6 +724,12 @@ void Server::CallHandler(ClientSocket *client, int payloadSize)
         CallHandlerSay(client, _payload);
         break;
     }
+    case CMSG_LS_REMOTE:
+        connLog << OPCODE_STR(CMSG_LS_REMOTE);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+        CallHandlerListRemoteDirectoryContent(client);
+        break;
     default:
         // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
         uint16_t CMSG_UNKNOWN_OPCODE = opcode;
@@ -1100,4 +1107,81 @@ void Server::CallHandlerSay(ClientSocket *client, std::string message)
 
         SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_SAY_ERR));
     }
+}
+
+void Server::CallHandlerListRemoteDirectoryContent(ClientSocket *client)
+{
+    std::string packet;
+    uint8_t error              = FMERR_OK;
+    uint8_t fileCount          = 0;
+    unsigned short int ropcode = htons(SMSG_LS_REMOTE);
+
+    std::vector<File> files    = get_files_in_dir(fm_remote_dir);
+
+    if (files.size() > UINT8_MAX)
+        error = FMERR_TOO_MUCH_FILES;
+
+    // Maximum packet payload available for serialized files.
+    constexpr std::size_t maxSerializedSize =
+        4096 - sizeof(error) - sizeof(fileCount) - sizeof(ropcode);
+
+    // serialize the files
+    // [filename length: uint8_t]
+    // [filename]
+    // [size: uint64_t]
+    // [md5sum: 16 bytes]
+    //
+    std::string fileSerializedData;
+    if (error == FMERR_OK)
+    {
+        for (const File &file : files)
+        {
+            if (file.filename.size() > UINT8_MAX)
+            {
+                error = FMERR_FILENAME_TOO_LONG;
+                break;
+            }
+
+            const uint8_t filenameLength =
+                static_cast<uint8_t>(file.filename.size());
+
+            fileSerializedData.append(
+                reinterpret_cast<const char *>(&filenameLength),
+                sizeof(filenameLength));
+
+            fileSerializedData.append(file.filename.data(),
+                                      file.filename.size());
+
+            fileSerializedData.append(
+                reinterpret_cast<const char *>(&file.size), sizeof(file.size));
+
+            fileSerializedData.append(reinterpret_cast<const char *>(file.md5),
+                                      sizeof(file.md5));
+
+            // Check immediately so we don't unnecessarily serialize
+            // the rest of the directory.
+            if (fileSerializedData.size() > maxSerializedSize)
+            {
+                error = FMERR_TOO_MUCH_FILES;
+                break;
+            }
+
+            fileCount++;
+        }
+    }
+
+    // check if the serialized data are too big
+    if (fileSerializedData.size() >=
+        (4096 - sizeof(error) - sizeof(fileCount) - sizeof(ropcode)))
+        error = FMERR_TOO_MUCH_FILES;
+
+    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
+    packet.append(reinterpret_cast<const char *>(&fileCount),
+                  sizeof(fileCount));
+
+    if (error == FMERR_OK)
+        packet += fileSerializedData;
+
+    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_LS_REMOTE));
 }

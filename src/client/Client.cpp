@@ -1,5 +1,6 @@
 #include "Client.h"
 #include "DebugUtils.h"
+#include "FileUtils.h"
 #include "OpCodes.h"
 #include "SharedDefinitions.h"
 
@@ -539,8 +540,21 @@ void Client::processReplyFromServerIfAny()
                       << std::flush;
             break;
         }
+        case SMSG_LS_REMOTE:
+        {
+            std::cout << "\rReceived ls remote message " << OPCODE_STR(SMSG_SAY)
+                      << '\n';
+            std::vector<File> files = deserialize_files(payload);
+            if (files.size() > 0)
+                print_files(files);
+            else
+                std::cout << "\n[empty set]\n";
+            std::cout << std::flush;
+            break;
+        }
         default:
-            std::cout << "\rReceived unknown opcode: " << opcode << std::flush;
+            std::cout << "\rReceived unknown opcode (client): " << opcode
+                      << std::flush;
             break;
         }
     }
@@ -721,3 +735,5 @@ void Client::sendChatSay(std::string const msg)
 
     sendSSLPacketToServer(packet);
 }
+
+void Client::sendListRemoteFile() { sendSSLOpcodeToServer(CMSG_LS_REMOTE); }

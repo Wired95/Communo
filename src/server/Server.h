@@ -162,6 +162,7 @@ class Server
     void CallHandlerJoinRoom(ClientSocket *client, size_t offset,
                              int payloadSize);
     void CallHandlerSay(ClientSocket *client, std::string message);
+    void CallHandlerListRemoteDirectoryContent(ClientSocket *client);
 };
 
 #endif // _SERVER_H_
