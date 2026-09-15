@@ -51,11 +51,17 @@ enum eChatErr : uint8_t
 inline constexpr const char *fm_local_dir  = FM_LOCAL_DIR;
 inline constexpr const char *fm_remote_dir = FM_REMOTE_DIR;
 
+#define FILE_CHUNK_SIZE 64 * 1024 // 64 kb
+
 enum eFileManagerErr : uint8_t
 {
     FMERR_OK,
     FMERR_TOO_MUCH_FILES,
     FMERR_FILENAME_TOO_LONG,
+    FMERR_INVALID_FILENAME,
+    FMERR_CANT_CREATE_FILE,
+    FMERR_REMOTE_FILE_EXISTS,
+    FMERR_WRITING_FILE,
 };
 
 #endif // _SHAREDDEFS_H_

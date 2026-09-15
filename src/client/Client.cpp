@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <poll.h>
@@ -268,6 +269,8 @@ void Client::processReplyFromServerIfAny()
     // We received valread bytes.
     if (valread >= static_cast<int>(sizeof(uint16_t)))
     {
+        m_canContinueUpload.store(false, std::memory_order_release);
+
         uint16_t opcode;
 
         std::memcpy(&opcode, buffer, sizeof(opcode));
@@ -542,13 +545,45 @@ void Client::processReplyFromServerIfAny()
         }
         case SMSG_LS_REMOTE:
         {
-            std::cout << "\rReceived ls remote message " << OPCODE_STR(SMSG_SAY)
-                      << '\n';
+            std::cout << "\rReceived ls remote message "
+                      << OPCODE_STR(SMSG_LS_REMOTE) << '\n';
             std::vector<File> files = deserialize_files(payload);
             if (files.size() > 0)
                 print_files(files);
             else
                 std::cout << "\n[empty set]\n";
+            std::cout << std::flush;
+            break;
+        }
+        case SMSG_UPLOAD_ERR:
+        {
+            std::cout << "\rReceived upload result "
+                      << OPCODE_STR(SMSG_UPLOAD_ERR) << '\n';
+
+            uint8_t value;
+            std::memcpy(&value, payload.data(), sizeof(uint8_t));
+            switch (value)
+            {
+            case FMERR_OK:
+                std::cout << "[all good]\n";
+                break;
+            case FMERR_INVALID_FILENAME:
+                std::cout << "[Error: invalid filename]\n";
+                break;
+            case FMERR_CANT_CREATE_FILE:
+                std::cout << "[Error: can't create file]\n";
+                break;
+            case FMERR_REMOTE_FILE_EXISTS:
+                std::cout << "[Error: remote file exists]\n";
+                break;
+            case FMERR_WRITING_FILE:
+                std::cout << "[Error: write file]\n";
+                break;
+            default:
+                std::cout << "[Error: " << std::to_string(value) << "]\n";
+                break;
+            }
+
             std::cout << std::flush;
             break;
         }
@@ -582,6 +617,27 @@ void Client::sendSSLPacketToServer(const std::string &packet)
     {
         std::cerr << "SSL_write() sent only " << sent << " of " << packet.size()
                   << " bytes\n";
+    }
+}
+
+void Client::sendSSLPacketToServer(const void *data, std::size_t size)
+{
+    const char *ptr = static_cast<const char *>(data);
+
+    while (size > 0)
+    {
+        int n = SSL_write(
+            m_ssl, ptr, static_cast<int>(std::min(size, std::size_t(INT_MAX))));
+
+        if (n <= 0)
+        {
+            int error = SSL_get_error(m_ssl, n);
+            throw std::runtime_error("SSL_write failed: " +
+                                     std::to_string(error));
+        }
+
+        ptr += n;
+        size -= n;
     }
 }
 
@@ -737,3 +793,48 @@ void Client::sendChatSay(std::string const msg)
 }
 
 void Client::sendListRemoteFile() { sendSSLOpcodeToServer(CMSG_LS_REMOTE); }
+
+void Client::sendFile(const std::filesystem::path &path)
+{
+    uint16_t opcode            = htons(CMSG_UPLOAD_FILE);
+    const std::string filename = path.filename().string();
+
+    m_canContinueUpload        = true;
+
+    if (filename.size() > UINT8_MAX)
+        throw std::runtime_error("Filename too long");
+
+    const std::uint8_t filename_length =
+        static_cast<std::uint8_t>(filename.size());
+
+    const std::uintmax_t file_size = std::filesystem::file_size(path);
+
+    // Header
+    sendSSLPacketToServer(&opcode, sizeof(opcode));
+    sendSSLPacketToServer(&filename_length, sizeof(filename_length));
+    sendSSLPacketToServer(filename.data(), filename.size());
+    sendSSLPacketToServer(&file_size, sizeof(file_size));
+
+    // File data
+    std::ifstream file(path, std::ios::binary);
+
+    if (!file)
+    {
+        std::cerr << "Cannot open file" << std::endl;
+        return;
+    }
+
+    char buffer[FILE_CHUNK_SIZE];
+
+    while (file && m_canContinueUpload.load(std::memory_order_acquire))
+    {
+        file.read(buffer, sizeof(buffer));
+        const std::streamsize count = file.gcount();
+
+        if (count > 0 && m_canContinueUpload.load(std::memory_order_acquire))
+            sendSSLPacketToServer(buffer, static_cast<std::size_t>(count));
+    }
+
+    if (!file.eof() && m_canContinueUpload.load(std::memory_order_acquire))
+        std::cerr << "Error while reading file to upload";
+}

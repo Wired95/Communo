@@ -8,7 +8,9 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
+#include <atomic>
 #include <chrono>
+#include <filesystem>
 #include <vector>
 
 #ifdef _WIN32
@@ -48,6 +50,7 @@ class Client
     void processReplyFromServerIfAny();
 
     void sendSSLPacketToServer(const std::string &packet);
+    void sendSSLPacketToServer(const void *data, std::size_t size);
     void sendSSLOpcodeToServer(const uint16_t opcode);
     void sendEchoRequest(std::string msg);
     void sendAdditionRequest(const std::vector<Number> numbers);
@@ -64,6 +67,7 @@ class Client
     void sendJoinRoomRequest(uint8_t roomID, std::string password);
     void sendChatSay(std::string const msg);
     void sendListRemoteFile();
+    void sendFile(const std::filesystem::path &path);
 
   private:
     unsigned long long m_Sock;
@@ -71,6 +75,8 @@ class Client
     SSL *m_ssl;
 
     std::chrono::steady_clock::time_point m_pingStart;
+
+    std::atomic_bool m_canContinueUpload;
 };
 
 #endif // _CLIENT_H_

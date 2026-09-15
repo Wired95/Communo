@@ -2,6 +2,8 @@
 #include <chrono>
 #include <cstring>
 #include <fcntl.h>
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <poll.h>
@@ -578,6 +580,73 @@ void Server::SendSSLPacketToClientSocket(
     }
 }
 
+bool Server::ReadClientSSLData(ClientSocket *client, void *data,
+                               std::size_t size)
+{
+    char *ptr = static_cast<char *>(data);
+    SSL *ssl  = client->ssl;
+
+    while (size > 0)
+    {
+        int n = SSL_read(
+            ssl, ptr, static_cast<int>(std::min(size, std::size_t(INT_MAX))));
+
+        if (n > 0)
+        {
+            ptr += n;
+            size -= n;
+            continue;
+        }
+
+        const int error = SSL_get_error(ssl, n);
+
+        if (error == SSL_ERROR_WANT_READ)
+        {
+            const int fd = SSL_get_fd(ssl);
+
+            struct pollfd pfd{};
+            pfd.fd     = fd;
+            pfd.events = POLLIN;
+
+            if (poll(&pfd, 1, -1) <= 0)
+            {
+                sLog.log(LOG_FLAG_ERROR, "poll() failed");
+                return false;
+            }
+
+            continue;
+        }
+
+        if (error == SSL_ERROR_WANT_WRITE)
+        {
+            const int fd = SSL_get_fd(ssl);
+
+            struct pollfd pfd{};
+            pfd.fd     = fd;
+            pfd.events = POLLOUT;
+
+            if (poll(&pfd, 1, -1) <= 0)
+            {
+                sLog.log(LOG_FLAG_ERROR, "poll() failed");
+                return false;
+            }
+
+            continue;
+        }
+
+        if (error == SSL_ERROR_ZERO_RETURN)
+        {
+            sLog.log(LOG_FLAG_INFO, "TLS connection closed cleanly");
+            return true;
+        }
+
+        sLog.log(LOG_FLAG_ERROR, "SSL_read failed: " + std::to_string(error));
+        return false;
+    }
+
+    return true;
+}
+
 void Server::CallHandler(ClientSocket *client, int payloadSize)
 {
     unsigned short int opcode;
@@ -729,6 +798,12 @@ void Server::CallHandler(ClientSocket *client, int payloadSize)
         sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
         CallHandlerListRemoteDirectoryContent(client);
+        break;
+    case CMSG_UPLOAD_FILE:
+        connLog << OPCODE_STR(CMSG_UPLOAD_FILE);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+        CallHandlerOnFileUpload(client);
         break;
     default:
         // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
@@ -1184,4 +1259,85 @@ void Server::CallHandlerListRemoteDirectoryContent(ClientSocket *client)
         packet += fileSerializedData;
 
     SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_LS_REMOTE));
+}
+
+void Server::CallHandlerOnFileUpload(ClientSocket *client)
+{
+    uint8_t error = FMERR_OK;
+    uint8_t filename_length;
+
+    if (!ReadClientSSLData(client, &filename_length, sizeof(filename_length)))
+        error = FMERR_INVALID_FILENAME;
+
+    std::string filename(filename_length, '\0');
+
+    if (error == FMERR_OK)
+        if (!ReadClientSSLData(client, filename.data(), filename.size()))
+            error = FMERR_INVALID_FILENAME;
+
+    uint64_t file_size;
+
+    if (error == FMERR_OK)
+        if (!ReadClientSSLData(client, &file_size, sizeof(file_size)))
+            error = FMERR_INVALID_FILENAME;
+
+    // Important: validate this before creating the file.
+    // At minimum, reject path traversal.
+    if (filename.empty() || filename == "." || filename == ".." ||
+        filename.find('/') != std::string::npos ||
+        filename.find('\\') != std::string::npos)
+    {
+        error = FMERR_INVALID_FILENAME;
+    }
+
+    std::filesystem::path path;
+    if (error == FMERR_OK)
+    {
+        path = std::filesystem::path(fm_remote_dir) / filename;
+
+        if (std::filesystem::exists(path))
+            error = FMERR_REMOTE_FILE_EXISTS;
+    }
+
+    /* @todo @fixme
+    make a multi-packet upload and a read-lock client-side
+    if the response packet is send during an upload client-side, the client
+    crashes to reproduce: send a big file (more than 3 chunks) already present
+    in the remote directory
+    */
+
+    if (error == FMERR_OK)
+    {
+        std::ofstream file(path, std::ios::binary);
+
+        if (!file)
+            error = FMERR_CANT_CREATE_FILE;
+
+        char buffer[FILE_CHUNK_SIZE];
+
+        std::uintmax_t remaining = file_size;
+
+        while (remaining > 0 && error == FMERR_OK)
+        {
+            const std::size_t chunk = static_cast<std::size_t>(
+                std::min<std::uintmax_t>(remaining, sizeof(buffer)));
+
+            ReadClientSSLData(client, buffer, chunk);
+
+            file.write(buffer, chunk);
+
+            if (!file)
+                error = FMERR_WRITING_FILE;
+
+            remaining -= chunk;
+        }
+    }
+
+    // send response packet
+    std::string packet;
+    uint16_t ropcode = htons(SMSG_UPLOAD_ERR);
+
+    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
+    packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
+    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_UPLOAD_ERR));
 }

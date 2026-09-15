@@ -3,6 +3,7 @@
 #include <atomic>
 #include <csignal>
 #include <cstring>
+#include <filesystem>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -353,8 +354,25 @@ int main(int argc, char const *argv[])
     cli.addCommand("file get", [&client](const std::vector<std::string> &args)
                    { std::cout << "file get\n"; });
 
-    cli.addCommand("file put", [&client](const std::vector<std::string> &args)
-                   { std::cout << "file put\n"; });
+    cli.addCommand("file put",
+                   [&client](const std::vector<std::string> &args)
+                   {
+                       if (args.size() != 1)
+                           throw std::runtime_error(
+                               "usage: file put <filename>");
+
+                       std::string filename(fm_local_dir);
+                       filename += "/";
+                       filename += args[0];
+
+                       if (std::filesystem::exists(filename) &&
+                           std::filesystem::is_regular_file(filename))
+                       {
+                           client.sendFile(std::filesystem::path(filename));
+                       }
+                       else
+                           throw std::runtime_error("Invalid file");
+                   });
 
     // help
     cli.addCommand("help",

@@ -147,6 +147,8 @@ class Server
                                 const std::string &opcodeFancyName =
                                     "[SMSG_DEFAULT_OPCODE_NAME (undefined)]");
 
+    bool ReadClientSSLData(ClientSocket *client, void *data, std::size_t size);
+
     void CallHandler(ClientSocket *client, int payloadSize);
     void CallHandlerEcho(ClientSocket *client, std::string reply);
     void CallHandlerAdd(ClientSocket *client, size_t offset, int payloadSize);
@@ -163,6 +165,7 @@ class Server
                              int payloadSize);
     void CallHandlerSay(ClientSocket *client, std::string message);
     void CallHandlerListRemoteDirectoryContent(ClientSocket *client);
+    void CallHandlerOnFileUpload(ClientSocket *client);
 };
 
 #endif // _SERVER_H_
