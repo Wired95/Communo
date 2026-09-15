@@ -41,7 +41,9 @@ class Chat
 
     bool isRoomProtected(uint8_t roomID)
     {
-        return !m_ChatRooms[roomID].passwordHash.empty();
+        auto it = m_ChatRooms.find(roomID);
+
+        return it != m_ChatRooms.end() && !it->second.passwordHash.empty();
     }
 
     bool checkPasswordHash(uint8_t roomID, const unsigned char *hash);
