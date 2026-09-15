@@ -106,7 +106,52 @@ if(${BuildType} STREQUAL "client" OR ${BuildType} STREQUAL "all")
         ${PROJECT_SOURCE_DIR}/src/common/
         ${PROJECT_SOURCE_DIR}/src/client/
     )
+endif()
 
+# Tests scripts
+if(${BuildType} STREQUAL "tests" OR ${BuildType} STREQUAL "all")
+    set(TESTS_DIR ${PROJECT_SOURCE_DIR}/src/tests)
+    set(DEFAULT_TEST_CPP ${CMAKE_CURRENT_BINARY_DIR}/test.cpp)
+
+    # Find all test sources.
+    file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS
+        ${TESTS_DIR}/*.h
+        ${TESTS_DIR}/*.hpp
+        ${TESTS_DIR}/*.cpp
+    )
+
+    # If the user has not provided a Main.cpp, generate a default one.
+    file(GLOB_RECURSE TEST_MAIN_FILES CONFIGURE_DEPENDS
+        ${TESTS_DIR}/Main.cpp
+    )
+
+    if(NOT TEST_MAIN_FILES)
+        file(WRITE ${DEFAULT_TEST_CPP}
+"// Auto-generated default test entry point.\n\
+int main()\n\
+{\n\
+    return 0;\n\
+}\n")
+        list(APPEND TEST_SOURCES ${DEFAULT_TEST_CPP})
+    endif()
+
+    add_executable(Tests)
+
+    target_sources(Tests PRIVATE
+        ${TEST_SOURCES}
+    )
+
+    target_link_libraries(Tests
+        Common
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        sqlite3
+    )
+
+    target_include_directories(Tests PUBLIC
+        ${PROJECT_SOURCE_DIR}/src/common/
+        ${TESTS_DIR}
+    )
 endif()
 
 if(WIN32)
