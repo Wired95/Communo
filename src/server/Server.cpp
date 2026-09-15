@@ -355,54 +355,18 @@ void Server::SetSendHelloMessagesToNewClients(bool send)
 
 void Server::SendMsgToSocket(ClientSocket *client, const char *msg)
 {
-    std::string packet;
+    Packet pkt = INIT_PACKET(SMSG_MESSAGE);
+    pkt << msg;
 
-    unsigned short int opcode = htons(SMSG_MESSAGE);
-    packet.append(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
-    packet += msg;
-
-    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_MESSAGE));
-
-    sLog.log(LOG_FLAG_DEBUG, "SMSG_MESSAGE sent");
+    pkt.sendToSSLClient(client->ssl);
 }
 
 void Server::SendMOTD(ClientSocket &socket)
 {
-    std::string reply;
+    Packet pkt = INIT_PACKET(SMSG_MOTD);
+    pkt << m_HelloMsg;
 
-    unsigned short int opcode = htons(SMSG_MOTD);
-
-    reply.append(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
-
-    reply += m_HelloMsg;
-
-    const char *data = reply.data();
-    size_t remaining = reply.size();
-
-    while (remaining > 0)
-    {
-        int written = SSL_write(socket.ssl, data, static_cast<int>(remaining));
-
-        if (written <= 0)
-        {
-            int sslError = SSL_get_error(socket.ssl, written);
-
-            sLog.log(
-                LOG_FLAG_ERROR,
-                std::string("Failed to send SMSG_MOTD over TLS, SSL error: ") +
-                    std::to_string(sslError));
-
-            break;
-        }
-
-        data += written;
-        remaining -= static_cast<size_t>(written);
-    }
-
-    if (remaining == 0)
-    {
-        sLog.log(LOG_FLAG_DEBUG, "SMSG_MOTD sent");
-    }
+    pkt.sendToSSLClient(socket.ssl);
 }
 
 void Server::PoolActivity()
@@ -506,7 +470,7 @@ void Server::ProcessRequests()
 
         if (FD_ISSET(socket, &m_Readfds))
         {
-            int valread = SSL_read(it->ssl, buffer, sizeof(buffer));
+            int valread = SSL_read(it->ssl, buffer, MAX_PACKET_LENGTH);
 
             if (valread <= 0)
             {
@@ -529,7 +493,8 @@ void Server::ProcessRequests()
 
             if (valread >= static_cast<int>(sizeof(unsigned short)))
             {
-                CallHandler(&(*it), valread);
+                Packet packet(buffer, static_cast<std::size_t>(valread));
+                CallHandler(&(*it), packet);
             }
             else
             {
@@ -573,6 +538,33 @@ void Server::SendSSLPacketToClientSocket(
 
         std::stringstream errorLog;
         errorLog << "SSL_write failed for " << opcodeFancyName
+                 << ", SSL error: " << sslError;
+
+        sLog.log(LOG_FLAG_DEBUG, errorLog.str());
+        return;
+    }
+}
+
+void Server::SendSSLPacketToClientSocket(ClientSocket *client,
+                                         Packet const &packet)
+{
+    // Log the packet sending
+    std::stringstream connLog;
+    connLog << "Sending opcode: " << packet.fancy_name();
+    connLog << " (size:" << packet.size() << ")";
+    sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+    // Send the packet to the client socket
+    int sent =
+        SSL_write(client->ssl, packet.data(), static_cast<int>(packet.size()));
+
+    // check return codes
+    if (sent <= 0)
+    {
+        int sslError = SSL_get_error(client->ssl, sent);
+
+        std::stringstream errorLog;
+        errorLog << "SSL_write failed for " << packet.fancy_name()
                  << ", SSL error: " << sslError;
 
         sLog.log(LOG_FLAG_DEBUG, errorLog.str());
@@ -647,10 +639,10 @@ bool Server::ReadClientSSLData(ClientSocket *client, void *data,
     return true;
 }
 
-void Server::CallHandler(ClientSocket *client, int payloadSize)
+void Server::CallHandler(ClientSocket *client, Packet &packet)
 {
-    unsigned short int opcode;
-    memcpy(&opcode, buffer, sizeof(opcode));
+    uint16_t opcode;
+    packet >> opcode;
     opcode = ntohs(opcode);
 
     std::stringstream connLog;
@@ -659,18 +651,15 @@ void Server::CallHandler(ClientSocket *client, int payloadSize)
     std::string _payload;   // CMSG_ECHO_REQUEST
     size_t offset, minSize; // CMSG_ADDITION_REQUEST
 
+    size_t payloadSize = packet.size();
+
     switch (opcode)
     {
     case CMSG_ECHO_REQUEST:
-        // extract the message here
-        _payload =
-            std::string(buffer + sizeof(opcode), payloadSize - sizeof(opcode));
-
         connLog << OPCODE_STR(CMSG_ECHO_REQUEST) << std::endl;
-        connLog << "payload: " << _payload.c_str();
         sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-        CallHandlerEcho(client, _payload);
+        CallHandlerEcho(client, packet);
         break;
     case CMSG_ADDITION_REQUEST:
         connLog << OPCODE_STR(CMSG_ADDITION_REQUEST);
@@ -818,15 +807,17 @@ void Server::CallHandler(ClientSocket *client, int payloadSize)
     }
 }
 
-void Server::CallHandlerEcho(ClientSocket *client, std::string reply)
+void Server::CallHandlerEcho(ClientSocket *client, Packet &packet)
 {
-    std::string packet;
+    // extract the message
+    std::string msg(packet.size() - sizeof(uint16_t), '\0');
+    packet >> msg;
 
-    unsigned short int ropcode = htons(SMSG_ECHO_REQUEST);
-    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
-    packet += reply;
+    // send the response packet
+    Packet rpkt = INIT_PACKET(SMSG_ECHO_REQUEST);
+    rpkt << msg;
 
-    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_ECHO_REQUEST));
+    rpkt.sendToSSLClient(client->ssl);
 }
 
 void Server::CallHandlerAdd(ClientSocket *client, size_t offset,
@@ -859,22 +850,16 @@ void Server::CallHandlerAdd(ClientSocket *client, size_t offset,
     sLog.log(LOG_FLAG_DEBUG, std::string("Sum: ") + std::to_string(sum));
 
     // generate response packet
-    std::string packet;
-    unsigned short int ropcode = htons(SMSG_ADDITION_REQUEST);
-    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
-    packet.append(reinterpret_cast<const char *>(&sum), sizeof(sum));
+    Packet pkt = INIT_PACKET(SMSG_ADDITION_REQUEST);
+    pkt << sum;
 
-    SendSSLPacketToClientSocket(client, packet,
-                                OPCODE_OSTR(SMSG_ADDITION_REQUEST));
+    SendSSLPacketToClientSocket(client, pkt);
 }
 
 void Server::CallHandlerBroadcast(std::string const stream)
 {
-    std::string packet;
-
-    unsigned short int ropcode = htons(SMSG_BROADCAST);
-    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
-    packet += stream;
+    Packet pkt = INIT_PACKET(SMSG_BROADCAST);
+    pkt << stream;
 
     sLog.log(LOG_FLAG_DEBUG, std::string("Known clients: ") +
                                  std::to_string(m_ClientSocket.size()));
@@ -884,8 +869,7 @@ void Server::CallHandlerBroadcast(std::string const stream)
         if (!client.sslEnabled)
             continue;
 
-        SendSSLPacketToClientSocket(&client, packet,
-                                    OPCODE_OSTR(SMSG_BROADCAST));
+        SendSSLPacketToClientSocket(&client, pkt);
     }
 }
 
@@ -898,11 +882,9 @@ void Server::CallHandlerGetClientList(ClientSocket *client)
     //   [uint32 clientID]
     //   [uint16 usernameLength]
     //   [uint8  username bytes]
-    std::string packet, clientList;
 
-    uint8_t error              = ERR_OK;
-    unsigned short int ropcode = htons(SMSG_CLIENT_LIST);
-    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
+    std::string clientList;
+    uint8_t error = ERR_OK;
 
     if (m_ClientSocket.size() > 0)
     {
@@ -931,20 +913,22 @@ void Server::CallHandlerGetClientList(ClientSocket *client)
         error = ERR_NO_CLIENT_FOUND;
     }
 
-    size_t packetSize = sizeof(ropcode) + sizeof(error) + clientList.size();
+    Packet pkt = INIT_PACKET(SMSG_CLIENT_LIST);
+    size_t packetSize =
+        sizeof(SMSG_CLIENT_LIST) + sizeof(error) + clientList.size();
 
     if (packetSize <= 4096)
     {
-        packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
-        packet.append(clientList);
+        pkt << error;
+        pkt << clientList;
     }
     else
     {
         error = ERR_TOO_MUCH_CLIENTS;
-        packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
+        pkt << error;
     }
 
-    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_CLIENT_LIST));
+    pkt.sendToSSLClient(client->ssl);
 }
 
 void Server::CallHandlerMsgToClient(ClientSocket *client, size_t offset,
@@ -988,50 +972,35 @@ void Server::CallHandlerMsgToClient(ClientSocket *client, size_t offset,
     }
 
     // Send status to the "from" client
-    unsigned short int ropcode = htons(SMSG_PRIVATE_MSG_ERR);
-    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
-    packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
-    SendSSLPacketToClientSocket(client, packet,
-                                OPCODE_OSTR(SMSG_PRIVATE_MSG_ERR));
+    Packet pkt = INIT_PACKET(SMSG_PRIVATE_MSG_ERR);
+    pkt << error;
+    pkt.sendToSSLClient(client->ssl);
 
     // send message to foundClient if everything is correct
     if (error == ERR_OK)
     {
-        // Reset packet
-        packet  = "";
-
         // Prepare message
-        ropcode = htons(SMSG_PRIVATE_MESSAGE);
-        packet.append(reinterpret_cast<const char *>(&ropcode),
-                      sizeof(ropcode));
-        packet.append(reinterpret_cast<const char *>(&client->clientID),
-                      sizeof(client->clientID));
-        packet += message;
+        Packet rpkt = INIT_PACKET(SMSG_PRIVATE_MESSAGE);
+        rpkt << client->clientID;
+        rpkt << message;
 
-        SendSSLPacketToClientSocket(foundClient, packet,
-                                    OPCODE_OSTR(SMSG_PRIVATE_MESSAGE));
+        // Send message to found client
+        rpkt.sendToSSLClient(foundClient->ssl);
     }
 }
 
 void Server::CallHandlerPong(ClientSocket *client)
 {
-    std::string packet;
-
-    unsigned short int ropcode = htons(SMSG_PONG);
-    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
-
-    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_PONG));
+    Packet pkt = INIT_PACKET(SMSG_PONG);
+    pkt.sendToSSLClient(client->ssl);
 }
 
 void Server::CallHandlerUptime(ClientSocket *client)
 {
-    std::string packet;
-
-    unsigned short int ropcode = htons(SMSG_UPTIME);
-    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
+    Packet pkt = INIT_PACKET(SMSG_UPTIME);
 
     // compute uptime
-    auto now = std::chrono::steady_clock::now();
+    auto now   = std::chrono::steady_clock::now();
     auto seconds =
         std::chrono::duration_cast<std::chrono::seconds>(now - m_StartTime)
             .count();
@@ -1043,23 +1012,20 @@ void Server::CallHandlerUptime(ClientSocket *client)
     seconds %= 60;
 
     // Format uptime
-    packet += "Uptime: " + std::to_string(hours) + "h " +
-              std::to_string(minutes) + "m " + std::to_string(seconds) + "s";
+    pkt << "Uptime: " << std::to_string(hours) << "h "
+        << std::to_string(minutes) << "m " << std::to_string(seconds) << "s";
 
-    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_UPTIME));
+    pkt.sendToSSLClient(client->ssl);
 }
 
 void Server::CallHandlerGetCounter(ClientSocket *client)
 {
-    std::string packet;
-
-    unsigned short int ropcode = htons(SMSG_COUNTER);
-    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
+    Packet pkt       = INIT_PACKET(SMSG_COUNTER);
 
     uint64_t counter = sUniverse.getCounter();
-    packet.append(reinterpret_cast<const char *>(&counter), sizeof(counter));
+    pkt << counter;
 
-    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_COUNTER));
+    pkt.sendToSSLClient(client->ssl);
 }
 
 void Server::CallHandlerGetChatRooms(ClientSocket *client)
@@ -1091,7 +1057,6 @@ void Server::CallHandlerGetRoominfo(ClientSocket *client)
 void Server::CallHandlerJoinRoom(ClientSocket *client, size_t offset,
                                  int payloadSize)
 {
-    std::string packet;
     uint8_t error  = ERR_OK;
     uint8_t roomID = static_cast<uint8_t>(buffer[offset++]);
     unsigned char hash[SHA256_DIGEST_LENGTH];
@@ -1109,51 +1074,37 @@ void Server::CallHandlerJoinRoom(ClientSocket *client, size_t offset,
 
     if (error == ERR_OK)
     {
-        client->joinedChatRoomID   = roomID;
-        client->chatRoomJoined     = true;
+        client->joinedChatRoomID = roomID;
+        client->chatRoomJoined   = true;
 
-        unsigned short int ropcode = htons(SMSG_JOIN_CHAT_ROOM_OK);
-        packet.append(reinterpret_cast<const char *>(&ropcode),
-                      sizeof(ropcode));
+        Packet pkt               = INIT_PACKET(SMSG_JOIN_CHAT_ROOM_OK);
+        pkt << roomID;
 
-        packet.append(reinterpret_cast<const char *>(&roomID), sizeof(roomID));
-
-        SendSSLPacketToClientSocket(client, packet,
-                                    OPCODE_OSTR(SMSG_JOIN_CHAT_ROOM_OK));
+        pkt.sendToSSLClient(client->ssl);
     }
     else
     {
-        unsigned short int ropcode = htons(SMSG_JOIN_CHAT_ROOM_ERR);
-        packet.append(reinterpret_cast<const char *>(&ropcode),
-                      sizeof(ropcode));
+        Packet pkt = INIT_PACKET(SMSG_JOIN_CHAT_ROOM_ERR);
+        pkt << error;
 
-        packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
-
-        SendSSLPacketToClientSocket(client, packet,
-                                    OPCODE_OSTR(SMSG_JOIN_CHAT_ROOM_ERR));
+        pkt.sendToSSLClient(client->ssl);
     }
 }
 
 void Server::CallHandlerSay(ClientSocket *client, std::string message)
 {
-    std::string packet = "";
-    uint8_t roomID     = client->joinedChatRoomID;
+    uint8_t roomID = client->joinedChatRoomID;
     unsigned short int ropcode;
 
     if (sChat.checkRoomID(roomID) && client->chatRoomJoined)
     {
         // the room is valid, send that everything is OK
-        ropcode = htons(SMSG_SAY_OK);
-        packet.append(reinterpret_cast<const char *>(&ropcode),
-                      sizeof(ropcode));
-        SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_SAY_OK));
+        Packet pktOK = INIT_PACKET(SMSG_SAY_OK);
+        pktOK.sendToSSLClient(client->ssl);
 
         // prepare message packet
-        packet  = "";
-        ropcode = htons(SMSG_SAY);
-        packet.append(reinterpret_cast<const char *>(&ropcode),
-                      sizeof(ropcode));
-        packet += message;
+        Packet pktSAY = INIT_PACKET(SMSG_SAY);
+        pktSAY << message;
 
         // Broadcast messages to valid clients
         for (ClientSocket &_client : m_ClientSocket)
@@ -1164,8 +1115,7 @@ void Server::CallHandlerSay(ClientSocket *client, std::string message)
             if (_client.joinedChatRoomID != roomID || !_client.chatRoomJoined)
                 continue;
 
-            SendSSLPacketToClientSocket(&_client, packet,
-                                        OPCODE_OSTR(SMSG_BROADCAST));
+            pktSAY.sendToSSLClient(_client.ssl);
         }
     }
     else
@@ -1175,30 +1125,25 @@ void Server::CallHandlerSay(ClientSocket *client, std::string message)
         if (!client->chatRoomJoined)
             error = ERR_NO_ROOM_JOINED;
 
-        ropcode = htons(SMSG_SAY_ERR);
-        packet.append(reinterpret_cast<const char *>(&ropcode),
-                      sizeof(ropcode));
-        packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
-
-        SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_SAY_ERR));
+        Packet pktERR = INIT_PACKET(SMSG_SAY_ERR);
+        pktERR << error;
+        pktERR.sendToSSLClient(client->ssl);
     }
 }
 
 void Server::CallHandlerListRemoteDirectoryContent(ClientSocket *client)
 {
-    std::string packet;
-    uint8_t error              = FMERR_OK;
-    uint8_t fileCount          = 0;
-    unsigned short int ropcode = htons(SMSG_LS_REMOTE);
+    uint8_t error           = FMERR_OK;
+    uint8_t fileCount       = 0;
 
-    std::vector<File> files    = get_files_in_dir(fm_remote_dir);
+    std::vector<File> files = get_files_in_dir(fm_remote_dir);
 
     if (files.size() > UINT8_MAX)
         error = FMERR_TOO_MUCH_FILES;
 
     // Maximum packet payload available for serialized files.
     constexpr std::size_t maxSerializedSize =
-        4096 - sizeof(error) - sizeof(fileCount) - sizeof(ropcode);
+        4096 - sizeof(error) - sizeof(fileCount) - sizeof(uint16_t);
 
     // serialize the files
     // [filename length: uint8_t]
@@ -1247,18 +1192,17 @@ void Server::CallHandlerListRemoteDirectoryContent(ClientSocket *client)
 
     // check if the serialized data are too big
     if (fileSerializedData.size() >=
-        (4096 - sizeof(error) - sizeof(fileCount) - sizeof(ropcode)))
+        (4096 - sizeof(error) - sizeof(fileCount) - sizeof(uint16_t)))
         error = FMERR_TOO_MUCH_FILES;
 
-    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
-    packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
-    packet.append(reinterpret_cast<const char *>(&fileCount),
-                  sizeof(fileCount));
+    Packet pkt = INIT_PACKET(SMSG_LS_REMOTE);
+    pkt << error;
+    pkt << fileCount;
 
     if (error == FMERR_OK)
-        packet += fileSerializedData;
+        pkt << fileSerializedData;
 
-    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_LS_REMOTE));
+    pkt.sendToSSLClient(client->ssl);
 }
 
 void Server::CallHandlerOnFileUpload(ClientSocket *client)
@@ -1334,10 +1278,7 @@ void Server::CallHandlerOnFileUpload(ClientSocket *client)
     }
 
     // send response packet
-    std::string packet;
-    uint16_t ropcode = htons(SMSG_UPLOAD_ERR);
-
-    packet.append(reinterpret_cast<const char *>(&ropcode), sizeof(ropcode));
-    packet.append(reinterpret_cast<const char *>(&error), sizeof(error));
-    SendSSLPacketToClientSocket(client, packet, OPCODE_OSTR(SMSG_UPLOAD_ERR));
+    Packet pkt = INIT_PACKET(SMSG_UPLOAD_ERR);
+    pkt << error;
+    pkt.sendToSSLClient(client->ssl);
 }

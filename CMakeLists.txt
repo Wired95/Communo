@@ -52,6 +52,8 @@ add_library(Common STATIC
     src/common/Logging.cpp
     src/common/NumParser.h
     src/common/NumParser.cpp
+    src/common/Packet.cpp
+    src/common/Packet.h
     src/common/Singleton.h
 )
 

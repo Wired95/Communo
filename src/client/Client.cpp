@@ -2,6 +2,7 @@
 #include "DebugUtils.h"
 #include "FileUtils.h"
 #include "OpCodes.h"
+#include "Packet.h"
 #include "SharedDefinitions.h"
 
 #include <arpa/inet.h>
@@ -19,6 +20,8 @@
 #include <vector>
 
 #include <openssl/sha.h>
+
+#define VAR_NAME(x) #x
 
 Client::~Client()
 {
@@ -431,7 +434,7 @@ void Client::processReplyFromServerIfAny()
 
             std::cout << "\rReceived private message from client ["
                       << std::to_string(clientID) << "] "
-                      << OPCODE_STR(SMSG_PRIVATE_MSG_ERR) << ":\n"
+                      << OPCODE_STR(SMSG_PRIVATE_MESSAGE) << ":\n"
                       << message << '\n'
                       << std::flush;
 
@@ -653,20 +656,14 @@ void Client::sendSSLOpcodeToServer(const uint16_t opcode)
 
 void Client::sendEchoRequest(std::string msg)
 {
-    std::string packet;
+    Packet pkt = INIT_PACKET(CMSG_ECHO_REQUEST);
+    pkt << msg;
 
-    uint16_t opcode = htons(CMSG_ECHO_REQUEST);
-    packet.append(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
-
-    packet += msg;
-
-    sendSSLPacketToServer(packet);
+    pkt.sendToSSLClient(m_ssl);
 }
 
 void Client::sendAdditionRequest(const std::vector<Number> numbers)
 {
-    std::string packet;
-
     if (numbers.size() < 2)
     {
         std::cerr << "Not enough numbers to send, aborting server call..."
@@ -675,28 +672,22 @@ void Client::sendAdditionRequest(const std::vector<Number> numbers)
     }
 
     // Write opcode
-    uint16_t opcode = htons(CMSG_ADDITION_REQUEST);
-    packet.append(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
+    Packet pkt = INIT_PACKET(CMSG_ADDITION_REQUEST);
 
     // Write packet like [type1][num1 bytes][type2][num2 bytes]...
     for (Number num : numbers)
     {
-        // Write number type
-        eNumberTypes type = get_number_type(num);
-        packet.push_back(static_cast<char>(type));
-
-        // Write number bytes
-        append_number(packet, num);
+        pkt << num;
     }
 
-    if (packet.size() > 4096)
+    if (pkt.size() > 4096)
     {
         std::cerr << "Too much numbers to send, aborting server call..."
                   << std::endl;
         return;
     }
 
-    sendSSLPacketToServer(packet);
+    pkt.sendToSSLClient(m_ssl);
 }
 
 void Client::sendBroadcast(std::string const msg)

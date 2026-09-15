@@ -4,6 +4,7 @@
 #include "Chat.h"
 #include "Logging.h"
 #include "NetworkHeaders.h"
+#include "Packet.h"
 #include "SharedDefinitions.h"
 
 #include <openssl/err.h>
@@ -13,6 +14,11 @@
 #include <cstdlib>
 #include <iostream>
 #include <vector>
+
+constexpr std::size_t MAX_PACKET_LENGTH = FILE_CHUNK_SIZE +
+                                          sizeof(uint16_t)      // opcode
+                                          + UPLOAD_TOKEN_LENGTH // upload token
+                                          + sizeof(uint64_t);   // chunk ID
 
 enum class eServerState
 {
@@ -122,7 +128,7 @@ class Server
     // Used to give each connected client an unique ID
     uint64_t m_UniqueCLientCounter;
 
-    char buffer[4096]; // data buffer of 4K
+    char buffer[MAX_PACKET_LENGTH];
 
     int m_MasterSocket;
     struct sockaddr_in m_Adress;
@@ -147,10 +153,13 @@ class Server
                                 const std::string &opcodeFancyName =
                                     "[SMSG_DEFAULT_OPCODE_NAME (undefined)]");
 
+    void SendSSLPacketToClientSocket(ClientSocket *client,
+                                     Packet const &packet);
+
     bool ReadClientSSLData(ClientSocket *client, void *data, std::size_t size);
 
-    void CallHandler(ClientSocket *client, int payloadSize);
-    void CallHandlerEcho(ClientSocket *client, std::string reply);
+    void CallHandler(ClientSocket *client, Packet &packet);
+    void CallHandlerEcho(ClientSocket *client, Packet &packet);
     void CallHandlerAdd(ClientSocket *client, size_t offset, int payloadSize);
     void CallHandlerBroadcast(std::string const stream);
     void CallHandlerGetClientList(ClientSocket *client);

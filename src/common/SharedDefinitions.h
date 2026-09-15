@@ -52,6 +52,7 @@ inline constexpr const char *fm_local_dir  = FM_LOCAL_DIR;
 inline constexpr const char *fm_remote_dir = FM_REMOTE_DIR;
 
 #define FILE_CHUNK_SIZE 64 * 1024 // 64 kb
+#define UPLOAD_TOKEN_LENGTH 32
 
 enum eFileManagerErr : uint8_t
 {
