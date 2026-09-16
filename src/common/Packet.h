@@ -83,6 +83,9 @@ class Packet
         return *this;
     }
 
+    Packet &operator>>(eNumberTypes &type);
+    Packet &operator>>(Number &num);
+
     const std::byte *data() const
     {
         return reinterpret_cast<const std::byte *>(this->m_data.data());
@@ -97,6 +100,8 @@ class Packet
            << static_cast<uint16_t>(m_opcode) << ")]";
         return ss.str();
     }
+
+    bool canRead() const { return this->size() > this->m_offset; }
 
     void sendToSSLClient(SSL *ssl);
 

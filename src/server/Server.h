@@ -160,7 +160,7 @@ class Server
 
     void CallHandler(ClientSocket *client, Packet &packet);
     void CallHandlerEcho(ClientSocket *client, Packet &packet);
-    void CallHandlerAdd(ClientSocket *client, size_t offset, int payloadSize);
+    void CallHandlerAdd(ClientSocket *client, Packet &packet);
     void CallHandlerBroadcast(std::string const stream);
     void CallHandlerGetClientList(ClientSocket *client);
     void CallHandlerMsgToClient(ClientSocket *client, size_t offset,

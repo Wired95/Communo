@@ -24,6 +24,26 @@ Packet &Packet::operator<<(const Number num)
     return *this;
 }
 
+Packet &Packet::operator>>(eNumberTypes &type)
+{
+    uint8_t value;
+    *this >> value;
+
+    type = static_cast<eNumberTypes>(value);
+
+    return *this;
+}
+
+Packet &Packet::operator>>(Number &num)
+{
+    eNumberTypes type;
+    *this >> type;
+
+    num = read_number(this->m_data.c_str(), this->m_offset, type);
+
+    return *this;
+}
+
 void Packet::sendToSSLClient(SSL *ssl)
 {
     // Log the packet sending

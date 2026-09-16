@@ -664,19 +664,18 @@ void Server::CallHandler(ClientSocket *client, Packet &packet)
     case CMSG_ADDITION_REQUEST:
         connLog << OPCODE_STR(CMSG_ADDITION_REQUEST);
 
-        // check minimal required packet size
-        offset  = sizeof(opcode);
-        //        opcode + 2 number types           + smallest numbers (2)
-        minSize = offset + sizeof(eNumberTypes) * 2 + sizeof(uint8_t) * 2;
+        //            opcode + 2 number types           + 2 smallest numbers
+        minSize =
+            sizeof(uint16_t) + sizeof(eNumberTypes) * 2 + sizeof(uint8_t) * 2;
 
-        if (minSize > payloadSize)
+        if (minSize > packet.size())
             connLog << "Invalid opcode length, aborting handler call"
                     << std::endl;
 
         sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-        if (minSize <= payloadSize)
-            CallHandlerAdd(client, offset, payloadSize);
+        if (minSize <= packet.size())
+            CallHandlerAdd(client, packet);
 
         break;
 
@@ -820,25 +819,19 @@ void Server::CallHandlerEcho(ClientSocket *client, Packet &packet)
     rpkt.sendToSSLClient(client->ssl);
 }
 
-void Server::CallHandlerAdd(ClientSocket *client, size_t offset,
-                            int payloadSize)
+void Server::CallHandlerAdd(ClientSocket *client, Packet &packet)
 {
-    std::stringstream connLog;
-
     double sum = 0;
 
-    while (offset < payloadSize)
+    while (packet.canRead())
     {
-        // Get number types to parse
-        eNumberTypes type =
-            static_cast<eNumberTypes>(static_cast<uint8_t>(buffer[offset++]));
-
         // Retrieve number values
-        Number num = read_number(buffer, offset, type);
+        Number num;
+        packet >> num;
 
         sLog.log(LOG_FLAG_DEBUG, std::string("Number type:") +
-                                     std::to_string(type) + " -> " +
-                                     number_to_string(num));
+                                     std::to_string(get_number_type(num)) +
+                                     " -> " + number_to_string(num));
 
         // cast everithing to double and perform the sum
         double val =
