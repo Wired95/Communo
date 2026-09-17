@@ -35,7 +35,7 @@ enum eOpcodes : uint16_t
     CMSG_LS_REMOTE           = 0x000F,
     CMSG_UPLOAD_INIT         = 0x0010,
     CMSG_UPLOAD_DATA         = 0x0011,
-    CMSG_UPLOAD_STATUS       = 0x0012, // todo
+    CMSG_UPLOAD_STATUS       = 0x0012,
     CMSG_DOWNLOAD_FILE       = 0x0013, // todo
 
     // Server messages

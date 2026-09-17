@@ -346,7 +346,8 @@ int main(int argc, char const *argv[])
                                  << "  ls-remote\n"
                                  << "  get <filename>\n"
                                  << "  init-upload <filename>\n"
-                                 << "  start-upload <token> <filename>\n";
+                                 << "  start-upload <token> <filename>\n"
+                                 << "  get-upload-status <token>\n";
                    });
 
     cli.addCommand("file ls", [](const std::vector<std::string> &args)
@@ -407,6 +408,16 @@ int main(int argc, char const *argv[])
                        }
 
                        g_ReadLock = false;
+                   });
+
+    cli.addCommand("file get-upload-status",
+                   [&client](const std::vector<std::string> &args)
+                   {
+                       if (args.size() != 1)
+                           throw std::runtime_error(
+                               "usage: file get-upload-status <token>");
+
+                       client.sendGetUploadStatus(args[0]);
                    });
 
     // help

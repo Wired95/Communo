@@ -69,6 +69,7 @@ class Client
     void sendListRemoteFile();
     void sendFileInitUpload(const std::filesystem::path &path);
     void sendFile(std::string const token, const std::filesystem::path &path);
+    void sendGetUploadStatus(std::string const token);
 
   private:
     unsigned long long m_Sock;

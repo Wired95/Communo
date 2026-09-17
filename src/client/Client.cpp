@@ -575,7 +575,7 @@ void Client::processReplyFromServerIfAny()
         }
         case SMSG_UPLOAD_ERR:
         {
-            std::cout << "\rReceived upload result "
+            std::cout << "\rReceived upload error "
                       << OPCODE_STR(SMSG_UPLOAD_ERR) << '\n';
 
             uint8_t value;
@@ -596,6 +596,35 @@ void Client::processReplyFromServerIfAny()
                 break;
             case FMERR_WRITING_FILE:
                 std::cout << "[Error: write file]\n";
+                break;
+            default:
+                std::cout << "[Error: " << std::to_string(value) << "]\n";
+                break;
+            }
+
+            std::cout << std::flush;
+            break;
+        }
+        case SMSG_UPLOAD_STATUS:
+        {
+            std::cout << "\rReceived upload status "
+                      << OPCODE_STR(SMSG_UPLOAD_STATUS) << '\n';
+
+            uint8_t value;
+            std::memcpy(&value, payload.data(), sizeof(uint8_t));
+            switch (value)
+            {
+            case UPLOAD_NOT_STARTED:
+                std::cout << "[not started]\n";
+                break;
+            case UPLOAD_NOT_FOUND:
+                std::cout << "[Error: upload not found from token]\n";
+                break;
+            case UPLOAD_IN_PROGRESS:
+                std::cout << "[upload in progress]\n";
+                break;
+            case UPLOAD_COMPLETE:
+                std::cout << "[upload complete]\n";
                 break;
             default:
                 std::cout << "[Error: " << std::to_string(value) << "]\n";
@@ -894,4 +923,25 @@ void Client::sendFile(std::string const token,
 
     if (!file.eof())
         std::cerr << "Error while reading file to upload";
+}
+
+void Client::sendGetUploadStatus(std::string const token)
+{
+    std::array<uint8_t, UPLOAD_TOKEN_LENGTH> btoken{};
+
+    try
+    {
+        btoken = strToUploadToken(token);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Invalid upload token: " << e.what() << '\n';
+        return;
+    }
+
+    Packet pkt = INIT_PACKET(CMSG_UPLOAD_STATUS);
+    for (const auto byte : btoken)
+        pkt << byte;
+
+    pkt.sendToSSLClient(m_ssl);
 }

@@ -843,12 +843,12 @@ void Server::CallHandler(ClientSocket *client, Packet &packet)
 
         CallHandlerUploadDataReived(client, packet);
         break;
-    /*case CMSG_UPLOAD_FILE:
-        connLog << OPCODE_STR(CMSG_UPLOAD_FILE);
+    case CMSG_UPLOAD_STATUS:
+        connLog << OPCODE_STR(CMSG_UPLOAD_STATUS);
         sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-        CallHandlerOnFileUpload(client);
-        break;*/
+        CallHandlerFileUploadStatus(client, packet);
+        break;
     default:
         // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
         uint16_t CMSG_UNKNOWN_OPCODE = opcode;
@@ -1320,80 +1320,16 @@ void Server::CallHandlerUploadDataReived(ClientSocket *client, Packet &packet)
     sUploadMgr.processChunk(token, chunkID, chunk);
 }
 
-void CallHandlerOnFileUpload(ClientSocket *client)
+void Server::CallHandlerFileUploadStatus(ClientSocket *client, Packet &packet)
 {
-    uint8_t error = FMERR_OK;
-    uint8_t filename_length;
+    UploadToken token;
 
-    /*if (!ReadClientSSLData(client, &filename_length, sizeof(filename_length)))
-        error = FMERR_INVALID_FILENAME;
+    for (auto &byte : token)
+        packet >> byte;
 
-    std::string filename(filename_length, '\0');
+    eUploadStatus status = sUploadMgr.getUploadStatus(token);
 
-    if (error == FMERR_OK)
-        if (!ReadClientSSLData(client, filename.data(), filename.size()))
-            error = FMERR_INVALID_FILENAME;
-
-    uint64_t file_size;
-
-    if (error == FMERR_OK)
-        if (!ReadClientSSLData(client, &file_size, sizeof(file_size)))
-            error = FMERR_INVALID_FILENAME;*/
-
-    // Important: validate this before creating the file.
-    // At minimum, reject path traversal.
-    /*if (filename.empty() || filename == "." || filename == ".." ||
-        filename.find('/') != std::string::npos ||
-        filename.find('\\') != std::string::npos)
-    {
-        error = FMERR_INVALID_FILENAME;
-    }
-
-    std::filesystem::path path;
-    if (error == FMERR_OK)
-    {
-        path = std::filesystem::path(fm_remote_dir) / filename;
-
-        if (std::filesystem::exists(path))
-            error = FMERR_REMOTE_FILE_EXISTS;
-    }*/
-
-    /* @todo @fixme
-    make a multi-packet upload and a read-lock client-side
-    if the response packet is send during an upload client-side, the client
-    crashes to reproduce: send a big file (more than 3 chunks) already present
-    in the remote directory
-    */
-
-    /*if (error == FMERR_OK)
-    {
-        std::ofstream file(path, std::ios::binary);
-
-        if (!file)
-            error = FMERR_CANT_CREATE_FILE;
-
-        char buffer[FILE_CHUNK_SIZE];
-
-        std::uintmax_t remaining = file_size;
-
-        while (remaining > 0 && error == FMERR_OK)
-        {
-            const std::size_t chunk = static_cast<std::size_t>(
-                std::min<std::uintmax_t>(remaining, sizeof(buffer)));
-
-            ReadClientSSLData(client, buffer, chunk);
-
-            file.write(buffer, chunk);
-
-            if (!file)
-                error = FMERR_WRITING_FILE;
-
-            remaining -= chunk;
-        }
-    }
-
-    // send response packet
-    Packet pkt = INIT_PACKET(SMSG_UPLOAD_ERR);
-    pkt << error;
-    pkt.sendToSSLClient(client->ssl);*/
+    Packet pkt           = INIT_PACKET(SMSG_UPLOAD_STATUS);
+    pkt << status;
+    pkt.sendToSSLClient(client->ssl);
 }

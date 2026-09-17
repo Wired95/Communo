@@ -178,6 +178,7 @@ class Server
     void CallHandlerListRemoteDirectoryContent(ClientSocket *client);
     void CallHandlerOnFileUploadInit(ClientSocket *client, Packet &packet);
     void CallHandlerUploadDataReived(ClientSocket *client, Packet &packet);
+    void CallHandlerFileUploadStatus(ClientSocket *client, Packet &packet);
 };
 
 #endif // _SERVER_H_
