@@ -59,16 +59,18 @@ add_library(Common STATIC
 
 # Server scripts
 if(${BuildType} STREQUAL "server" OR ${BuildType} STREQUAL "all")
+
+    set(SERVER_DIR ${PROJECT_SOURCE_DIR}/src/server)
+
+    # Find all server sources.
+    file(GLOB_RECURSE SERVER_SOURCES CONFIGURE_DEPENDS
+        ${SERVER_DIR}/*.h
+        ${SERVER_DIR}/*.hpp
+        ${SERVER_DIR}/*.cpp
+    )
+
     add_executable (Server
-        src/server/Chat.cpp
-        src/server/Chat.h
-        src/server/Database.cpp
-        src/server/Database.h
-        src/server/Main.cpp
-        src/server/Server.cpp
-        src/server/Server.h
-        src/server/Universe.cpp
-        src/server/Universe.h
+        ${SERVER_SOURCES}
     )
 
     target_link_libraries(Server Common)
@@ -92,10 +94,18 @@ endif()
 
 # Client scripts
 if(${BuildType} STREQUAL "client" OR ${BuildType} STREQUAL "all")
-	add_executable (Client
-        src/client/Main.cpp
-        src/client/Client.cpp
-        src/client/Client.h
+
+    set(CLIENT_DIR ${PROJECT_SOURCE_DIR}/src/client)
+
+    # Find all cient sources.
+    file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS
+        ${CLIENT_DIR}/*.h
+        ${CLIENT_DIR}/*.hpp
+        ${CLIENT_DIR}/*.cpp
+    )
+
+    add_executable (Client
+        ${CLIENT_SOURCES}
     )
 
     target_link_libraries(Client
