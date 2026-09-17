@@ -19,9 +19,10 @@
 #include "Client.h"
 #include "DebugUtils.h"
 #include "FileUtils.h"
-#include "OpCodes.h"
+#include "Logging.h"
 
 std::atomic<bool> g_Running{true};
+std::atomic<bool> g_ReadLock{false};
 
 class CLI
 {
@@ -125,6 +126,9 @@ int main(int argc, char const *argv[])
 
     Client client;
     CLI cli;
+
+    sLog.setLogOutput(LOG_CONSOLE);
+    sLog.setLogLevel(LOG_LEVEL_DEBUG);
 
     if (!client.initClientConnection())
         return -1;
@@ -341,7 +345,8 @@ int main(int argc, char const *argv[])
                                  << "  ls\n"
                                  << "  ls-remote\n"
                                  << "  get <filename>\n"
-                                 << "  put <filename>\n";
+                                 << "  init-upload <filename>\n"
+                                 << "  start-upload <token> <filename>\n";
                    });
 
     cli.addCommand("file ls", [](const std::vector<std::string> &args)
@@ -354,24 +359,54 @@ int main(int argc, char const *argv[])
     cli.addCommand("file get", [&client](const std::vector<std::string> &args)
                    { std::cout << "file get\n"; });
 
-    cli.addCommand("file put",
+    cli.addCommand(
+        "file init-upload",
+        [&client](const std::vector<std::string> &args)
+        {
+            if (args.size() != 1)
+                throw std::runtime_error("usage: file init-upload <filename>");
+
+            std::string filename(fm_local_dir);
+            filename += "/";
+            filename += args[0];
+
+            if (std::filesystem::exists(filename) &&
+                std::filesystem::is_regular_file(filename))
+            {
+                client.sendFileInitUpload(std::filesystem::path(filename));
+            }
+            else
+                throw std::runtime_error("Invalid file");
+        });
+
+    cli.addCommand("file start-upload",
                    [&client](const std::vector<std::string> &args)
                    {
-                       if (args.size() != 1)
+                       g_ReadLock = true;
+                       if (args.size() != 2)
                            throw std::runtime_error(
-                               "usage: file put <filename>");
+                               "usage: file start-upload <token> <filename>");
+
+                       if (args[0].size() != UPLOAD_TOKEN_LENGTH * 2)
+                           throw std::runtime_error("Invalid token");
 
                        std::string filename(fm_local_dir);
                        filename += "/";
-                       filename += args[0];
+                       filename += args[1];
 
                        if (std::filesystem::exists(filename) &&
                            std::filesystem::is_regular_file(filename))
                        {
-                           client.sendFile(std::filesystem::path(filename));
+                           client.sendFile(args[0],
+                                           std::filesystem::path(filename));
                        }
                        else
+                       {
+                           g_ReadLock = false;
                            throw std::runtime_error("Invalid file");
+                       }
+
+                       g_ReadLock = false;
                    });
 
     // help
@@ -395,7 +430,8 @@ int main(int argc, char const *argv[])
         [&client]()
         {
             while (g_Running)
-                client.processReplyFromServerIfAny();
+                if (!g_ReadLock)
+                    client.processReplyFromServerIfAny();
         });
     t.detach();
 

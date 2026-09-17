@@ -67,7 +67,8 @@ class Client
     void sendJoinRoomRequest(uint8_t roomID, std::string password);
     void sendChatSay(std::string const msg);
     void sendListRemoteFile();
-    void sendFile(const std::filesystem::path &path);
+    void sendFileInitUpload(const std::filesystem::path &path);
+    void sendFile(std::string const token, const std::filesystem::path &path);
 
   private:
     unsigned long long m_Sock;
@@ -76,7 +77,7 @@ class Client
 
     std::chrono::steady_clock::time_point m_pingStart;
 
-    std::atomic_bool m_canContinueUpload;
+    // std::atomic_bool m_canContinueUpload;
 };
 
 #endif // _CLIENT_H_

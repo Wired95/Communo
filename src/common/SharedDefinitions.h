@@ -51,7 +51,12 @@ enum eChatErr : uint8_t
 inline constexpr const char *fm_local_dir  = FM_LOCAL_DIR;
 inline constexpr const char *fm_remote_dir = FM_REMOTE_DIR;
 
-#define FILE_CHUNK_SIZE 64 * 1024 // 64 kb
+// Warning: for simple messages, keep the message length
+//          below 16kb - data header
+// todo: append packet / message length to the packet
+//       for wider packets and server post-processing
+#define FILE_CHUNK_SIZE (14 * 1024) // 14 kb
+
 #define UPLOAD_TOKEN_LENGTH 32
 
 enum eFileManagerErr : uint8_t
@@ -60,9 +65,18 @@ enum eFileManagerErr : uint8_t
     FMERR_TOO_MUCH_FILES,
     FMERR_FILENAME_TOO_LONG,
     FMERR_INVALID_FILENAME,
+    FMERR_NOT_ENOUGH_SPACE,
     FMERR_CANT_CREATE_FILE,
     FMERR_REMOTE_FILE_EXISTS,
     FMERR_WRITING_FILE,
+};
+
+enum eUploadStatus : uint8_t
+{
+    UPLOAD_NOT_STARTED,
+    UPLOAD_NOT_FOUND,
+    UPLOAD_IN_PROGRESS,
+    UPLOAD_COMPLETE,
 };
 
 #endif // _SHAREDDEFS_H_

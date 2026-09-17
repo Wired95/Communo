@@ -33,8 +33,10 @@ enum eOpcodes : uint16_t
     CMSG_SAY                 = 0x000E,
 
     CMSG_LS_REMOTE           = 0x000F,
-    CMSG_UPLOAD_FILE         = 0x0010,
-    CMSG_DOWNLOAD_FILE       = 0x0011, // todo
+    CMSG_UPLOAD_INIT         = 0x0010,
+    CMSG_UPLOAD_DATA         = 0x0011,
+    CMSG_UPLOAD_STATUS       = 0x0012, // todo
+    CMSG_DOWNLOAD_FILE       = 0x0013, // todo
 
     // Server messages
     SMSG_MOTD                = 0x0FFF,
@@ -63,8 +65,10 @@ enum eOpcodes : uint16_t
     SMSG_SAY                 = 0x100F,
 
     SMSG_LS_REMOTE           = 0x1010,
-    SMSG_UPLOAD_ERR          = 0x1011, // todo
-    SMSG_DOWNLOAD            = 0x1012, // todo
+    SMSG_UPLOAD_ERR          = 0x1011,
+    SMSG_UPLOAD_TOKEN        = 0x1012,
+    SMSG_UPLOAD_STATUS       = 0x1013,
+    SMSG_DOWNLOAD            = 0x1014, // todo
 
     OPCODE_MAX               = (0x7FFF + 1),
 };

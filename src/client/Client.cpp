@@ -6,6 +6,7 @@
 #include "SharedDefinitions.h"
 
 #include <arpa/inet.h>
+#include <array>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
@@ -272,7 +273,7 @@ void Client::processReplyFromServerIfAny()
     // We received valread bytes.
     if (valread >= static_cast<int>(sizeof(uint16_t)))
     {
-        m_canContinueUpload.store(false, std::memory_order_release);
+        // m_canContinueUpload.store(false, std::memory_order_release);
 
         uint16_t opcode;
 
@@ -558,6 +559,20 @@ void Client::processReplyFromServerIfAny()
             std::cout << std::flush;
             break;
         }
+        case SMSG_UPLOAD_TOKEN:
+        {
+            std::cout << "\rReceived upload token "
+                      << OPCODE_STR(SMSG_UPLOAD_TOKEN) << ":\nToken: ";
+
+            for (const unsigned char byte : payload)
+            {
+                std::cout << std::hex << std::setw(2) << std::setfill('0')
+                          << static_cast<unsigned int>(byte);
+            }
+
+            std::cout << '\n' << std::dec << std::setfill(' ') << std::flush;
+            break;
+        }
         case SMSG_UPLOAD_ERR:
         {
             std::cout << "\rReceived upload result "
@@ -785,26 +800,67 @@ void Client::sendChatSay(std::string const msg)
 
 void Client::sendListRemoteFile() { sendSSLOpcodeToServer(CMSG_LS_REMOTE); }
 
-void Client::sendFile(const std::filesystem::path &path)
+void Client::sendFileInitUpload(const std::filesystem::path &path)
 {
-    uint16_t opcode            = htons(CMSG_UPLOAD_FILE);
     const std::string filename = path.filename().string();
-
-    m_canContinueUpload        = true;
 
     if (filename.size() > UINT8_MAX)
         throw std::runtime_error("Filename too long");
 
-    const std::uint8_t filename_length =
-        static_cast<std::uint8_t>(filename.size());
+    const uint8_t filename_length = static_cast<std::uint8_t>(filename.size());
+
+    const uint64_t file_size      = std::filesystem::file_size(path);
+
+    Packet pkt                    = INIT_PACKET(CMSG_UPLOAD_INIT);
+    pkt << filename_length << filename << file_size;
+    pkt.sendToSSLClient(m_ssl);
+}
+
+std::array<uint8_t, UPLOAD_TOKEN_LENGTH> strToUploadToken(std::string const str)
+{
+    auto hexValue = [](char c) -> std::uint8_t
+    {
+        if (c >= '0' && c <= '9')
+            return static_cast<std::uint8_t>(c - '0');
+
+        if (c >= 'a' && c <= 'f')
+            return static_cast<std::uint8_t>(c - 'a' + 10);
+
+        if (c >= 'A' && c <= 'F')
+            return static_cast<std::uint8_t>(c - 'A' + 10);
+
+        throw std::invalid_argument("Invalid hexadecimal character");
+    };
+
+    std::array<uint8_t, UPLOAD_TOKEN_LENGTH> token{};
+
+    for (std::size_t i = 0; i < token.size(); ++i)
+    {
+        const std::uint8_t high = hexValue(str[i * 2]);
+        const std::uint8_t low  = hexValue(str[i * 2 + 1]);
+
+        token[i]                = static_cast<std::uint8_t>((high << 4) | low);
+    }
+
+    return token;
+}
+
+void Client::sendFile(std::string const token,
+                      const std::filesystem::path &path)
+{
+    std::array<uint8_t, UPLOAD_TOKEN_LENGTH> btoken{};
+
+    try
+    {
+        btoken = strToUploadToken(token);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Invalid upload token: " << e.what() << '\n';
+        return;
+    }
 
     const std::uintmax_t file_size = std::filesystem::file_size(path);
-
-    // Header
-    sendSSLPacketToServer(&opcode, sizeof(opcode));
-    sendSSLPacketToServer(&filename_length, sizeof(filename_length));
-    sendSSLPacketToServer(filename.data(), filename.size());
-    sendSSLPacketToServer(&file_size, sizeof(file_size));
 
     // File data
     std::ifstream file(path, std::ios::binary);
@@ -817,15 +873,25 @@ void Client::sendFile(const std::filesystem::path &path)
 
     char buffer[FILE_CHUNK_SIZE];
 
-    while (file && m_canContinueUpload.load(std::memory_order_acquire))
+    uint64_t chunkID = 0;
+
+    std::cout << "file reading start" << std::endl;
+    while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0)
     {
-        file.read(buffer, sizeof(buffer));
         const std::streamsize count = file.gcount();
 
-        if (count > 0 && m_canContinueUpload.load(std::memory_order_acquire))
-            sendSSLPacketToServer(buffer, static_cast<std::size_t>(count));
+        Packet pkt                  = INIT_PACKET(CMSG_UPLOAD_DATA);
+
+        for (const auto byte : btoken)
+            pkt << byte;
+
+        pkt << chunkID;
+        pkt << std::string_view(buffer, static_cast<std::size_t>(count));
+
+        pkt.sendToSSLClient(m_ssl);
+        ++chunkID;
     }
 
-    if (!file.eof() && m_canContinueUpload.load(std::memory_order_acquire))
+    if (!file.eof())
         std::cerr << "Error while reading file to upload";
 }

@@ -20,6 +20,7 @@
 #include "OpCodes.h"
 #include "Server.h"
 #include "Universe.h"
+#include "UploadMgr.h"
 
 #ifdef _WIN32
 
@@ -455,7 +456,6 @@ void Server::HandleNewConnections()
 
 void Server::ProcessRequests()
 {
-    // else its some IO operation on some other socket
     for (std::vector<ClientSocket>::iterator it = m_ClientSocket.begin();
          it != m_ClientSocket.end();)
     {
@@ -474,19 +474,48 @@ void Server::ProcessRequests()
 
             if (valread <= 0)
             {
-                getpeername(socket, (struct sockaddr *)&m_Adress,
-                            (socklen_t *)&m_AddrLen);
+                const int sslError = SSL_get_error(it->ssl, valread);
+
+                // Non-blocking socket: this is not a disconnect.
+                if (sslError == SSL_ERROR_WANT_READ ||
+                    sslError == SSL_ERROR_WANT_WRITE)
+                {
+                    ++it;
+                    continue;
+                }
+
+                // Actual connection close/error.
+                getpeername(socket,
+                            reinterpret_cast<struct sockaddr *>(&m_Adress),
+                            reinterpret_cast<socklen_t *>(&m_AddrLen));
 
                 std::stringstream connLog;
                 connLog << "Host disconnected, ip is: "
                         << inet_ntoa(m_Adress.sin_addr)
-                        << ", port: " << ntohs(m_Adress.sin_port);
+                        << ", port: " << ntohs(m_Adress.sin_port)
+                        << ", SSL error: " << sslError;
 
                 sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
+                // Log OpenSSL details for TLS errors.
+                if (sslError == SSL_ERROR_SSL)
+                {
+                    unsigned long err;
+
+                    while ((err = ERR_get_error()) != 0)
+                    {
+                        char errorBuffer[256];
+
+                        ERR_error_string_n(err, errorBuffer,
+                                           sizeof(errorBuffer));
+
+                        sLog.log(LOG_FLAG_DEBUG, errorBuffer);
+                    }
+                }
+
                 it->close();
 
-                // erase() returns the next valid iterator
+                // erase() returns the next valid iterator.
                 it = m_ClientSocket.erase(it);
                 continue;
             }
@@ -494,6 +523,7 @@ void Server::ProcessRequests()
             if (valread >= static_cast<int>(sizeof(unsigned short)))
             {
                 Packet packet(buffer, static_cast<std::size_t>(valread));
+
                 CallHandler(&(*it), packet);
             }
             else
@@ -505,9 +535,22 @@ void Server::ProcessRequests()
 
                 if (sent <= 0)
                 {
-                    int ssl_error = SSL_get_error(it->ssl, sent);
+                    const int sslError = SSL_get_error(it->ssl, sent);
 
-                    // @todo: Handle SSL error here
+                    if (sslError != SSL_ERROR_WANT_READ &&
+                        sslError != SSL_ERROR_WANT_WRITE)
+                    {
+                        std::stringstream errorLog;
+                        errorLog << "SSL_write failed while sending "
+                                    "invalid packet response"
+                                 << ", SSL error: " << sslError;
+
+                        sLog.log(LOG_FLAG_DEBUG, errorLog.str());
+
+                        it->close();
+                        it = m_ClientSocket.erase(it);
+                        continue;
+                    }
                 }
             }
         }
@@ -702,8 +745,8 @@ void Server::CallHandler(ClientSocket *client, Packet &packet)
 
         // check minimal required packet size
         offset  = sizeof(opcode);
-        //        opcode + Client ID
-        minSize = offset + sizeof(uint64_t);
+        //                  opcode + Client ID
+        minSize = sizeof(uint16_t) + sizeof(uint64_t);
 
         if (minSize > payloadSize)
             connLog << "Invalid opcode length, aborting handler call"
@@ -753,9 +796,10 @@ void Server::CallHandler(ClientSocket *client, Packet &packet)
         break;
     case CMSG_JOIN_ROOM:
     {
-        offset              = sizeof(opcode);
+        offset = sizeof(opcode);
 
-        size_t requiredSize = offset + sizeof(uint8_t) + SHA256_DIGEST_LENGTH;
+        size_t requiredSize =
+            sizeof(uint16_t) + sizeof(uint8_t) + SHA256_DIGEST_LENGTH;
 
         if (payloadSize != requiredSize)
             connLog << "Invalid opcode length, aborting handler call"
@@ -771,8 +815,8 @@ void Server::CallHandler(ClientSocket *client, Packet &packet)
     case CMSG_SAY:
     {
         // extract the message here
-        _payload =
-            std::string(buffer + sizeof(opcode), payloadSize - sizeof(opcode));
+        _payload = std::string(buffer + sizeof(uint16_t),
+                               payloadSize - sizeof(uint16_t));
 
         connLog << OPCODE_STR(CMSG_SAY) << std::endl;
         connLog << "payload: " << _payload.c_str();
@@ -787,12 +831,24 @@ void Server::CallHandler(ClientSocket *client, Packet &packet)
 
         CallHandlerListRemoteDirectoryContent(client);
         break;
-    case CMSG_UPLOAD_FILE:
+    case CMSG_UPLOAD_INIT:
+        connLog << OPCODE_STR(CMSG_UPLOAD_INIT);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+        CallHandlerOnFileUploadInit(client, packet);
+        break;
+    case CMSG_UPLOAD_DATA:
+        connLog << OPCODE_STR(CMSG_UPLOAD_DATA);
+        sLog.log(LOG_FLAG_DEBUG, connLog.str());
+
+        CallHandlerUploadDataReived(client, packet);
+        break;
+    /*case CMSG_UPLOAD_FILE:
         connLog << OPCODE_STR(CMSG_UPLOAD_FILE);
         sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
         CallHandlerOnFileUpload(client);
-        break;
+        break;*/
     default:
         // Log the unknown opcode as CMSG_UNKNOWN_OPCODE
         uint16_t CMSG_UNKNOWN_OPCODE = opcode;
@@ -1198,12 +1254,78 @@ void Server::CallHandlerListRemoteDirectoryContent(ClientSocket *client)
     pkt.sendToSSLClient(client->ssl);
 }
 
-void Server::CallHandlerOnFileUpload(ClientSocket *client)
+void Server::CallHandlerOnFileUploadInit(ClientSocket *client, Packet &packet)
+{
+    eFileManagerErr error = FMERR_OK;
+    uint8_t filename_length;
+    uint64_t file_size;
+
+    packet >> filename_length;
+
+    std::string filename(filename_length, '\0');
+
+    packet >> filename;
+    packet >> file_size;
+
+    UploadToken token =
+        sUploadMgr.initiateNewUpload(filename, file_size, error);
+
+    if (error == FMERR_OK)
+    {
+        Packet pkt = INIT_PACKET(SMSG_UPLOAD_TOKEN);
+        for (const auto byte : token)
+            pkt << byte;
+        pkt.sendToSSLClient(client->ssl);
+    }
+    else
+    {
+        Packet pkt = INIT_PACKET(SMSG_UPLOAD_ERR);
+        pkt << (uint8_t)error;
+        pkt.sendToSSLClient(client->ssl);
+    }
+}
+
+void Server::CallHandlerUploadDataReived(ClientSocket *client, Packet &packet)
+{
+    UploadToken token;
+    UploadChunk chunk;
+    uint64_t chunkID;
+
+    for (auto &byte : token)
+        packet >> byte;
+
+    packet >> chunkID;
+
+    sLog.log(LOG_FLAG_DEBUG,
+             std::string("Upload [") + sUploadMgr.uploadTokenToString(token) +
+                 "] Received chunk: " + std::to_string(chunkID));
+
+    uint64_t itr = 0;
+    while (packet.canRead())
+    {
+        if (itr < chunk.size())
+            packet >> chunk[itr];
+        else
+        {
+            sLog.log(LOG_FLAG_ERROR,
+                     std::string("Upload [") +
+                         sUploadMgr.uploadTokenToString(token) +
+                         "] Received invalid chunk, data too long");
+            return;
+        }
+
+        itr++;
+    }
+
+    sUploadMgr.processChunk(token, chunkID, chunk);
+}
+
+void CallHandlerOnFileUpload(ClientSocket *client)
 {
     uint8_t error = FMERR_OK;
     uint8_t filename_length;
 
-    if (!ReadClientSSLData(client, &filename_length, sizeof(filename_length)))
+    /*if (!ReadClientSSLData(client, &filename_length, sizeof(filename_length)))
         error = FMERR_INVALID_FILENAME;
 
     std::string filename(filename_length, '\0');
@@ -1216,11 +1338,11 @@ void Server::CallHandlerOnFileUpload(ClientSocket *client)
 
     if (error == FMERR_OK)
         if (!ReadClientSSLData(client, &file_size, sizeof(file_size)))
-            error = FMERR_INVALID_FILENAME;
+            error = FMERR_INVALID_FILENAME;*/
 
     // Important: validate this before creating the file.
     // At minimum, reject path traversal.
-    if (filename.empty() || filename == "." || filename == ".." ||
+    /*if (filename.empty() || filename == "." || filename == ".." ||
         filename.find('/') != std::string::npos ||
         filename.find('\\') != std::string::npos)
     {
@@ -1234,7 +1356,7 @@ void Server::CallHandlerOnFileUpload(ClientSocket *client)
 
         if (std::filesystem::exists(path))
             error = FMERR_REMOTE_FILE_EXISTS;
-    }
+    }*/
 
     /* @todo @fixme
     make a multi-packet upload and a read-lock client-side
@@ -1243,7 +1365,7 @@ void Server::CallHandlerOnFileUpload(ClientSocket *client)
     in the remote directory
     */
 
-    if (error == FMERR_OK)
+    /*if (error == FMERR_OK)
     {
         std::ofstream file(path, std::ios::binary);
 
@@ -1273,5 +1395,5 @@ void Server::CallHandlerOnFileUpload(ClientSocket *client)
     // send response packet
     Packet pkt = INIT_PACKET(SMSG_UPLOAD_ERR);
     pkt << error;
-    pkt.sendToSSLClient(client->ssl);
+    pkt.sendToSSLClient(client->ssl);*/
 }

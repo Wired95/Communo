@@ -19,5 +19,5 @@ sequenceDiagram
     C->>S: CMSG_UPLOAD_STATUS
     Note over C,S: • opcode<br/>• token
 
-    S->>C: SMSG_UPLOAD_ERR
+    S->>C: SMSG_UPLOAD_STATUS
 ```

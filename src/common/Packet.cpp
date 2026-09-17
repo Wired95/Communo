@@ -46,25 +46,37 @@ Packet &Packet::operator>>(Number &num)
 
 void Packet::sendToSSLClient(SSL *ssl)
 {
-    // Log the packet sending
     std::stringstream connLog;
     connLog << "Sending opcode: " << this->fancy_name();
     connLog << " (size:" << this->size() << ")";
     sLog.log(LOG_FLAG_DEBUG, connLog.str());
 
-    // Send the packet to the client socket
-    int sent = SSL_write(ssl, this->data(), static_cast<int>(this->size()));
+    const char *data      = reinterpret_cast<const char *>(this->data());
 
-    // check return codes
-    if (sent <= 0)
+    std::size_t remaining = this->size();
+
+    while (remaining > 0)
     {
-        int sslError = SSL_get_error(ssl, sent);
+        const int toSend =
+            static_cast<int>(std::min<std::size_t>(remaining, INT_MAX));
+
+        const int sent = SSL_write(ssl, data, toSend);
+
+        if (sent > 0)
+        {
+            data += sent;
+            remaining -= static_cast<std::size_t>(sent);
+            continue;
+        }
+
+        const int sslError = SSL_get_error(ssl, sent);
 
         std::stringstream errorLog;
         errorLog << "SSL_write failed for " << this->fancy_name()
                  << ", SSL error: " << sslError;
 
         sLog.log(LOG_FLAG_DEBUG, errorLog.str());
+
         return;
     }
 }

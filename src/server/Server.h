@@ -73,6 +73,8 @@ struct ClientSocket
 
     uint64_t clientID;
     std::string clientUsername = "<unk>";
+
+    std::vector<std::byte> receiveBuffer;
 };
 
 class Server
@@ -174,7 +176,8 @@ class Server
                              int payloadSize);
     void CallHandlerSay(ClientSocket *client, std::string message);
     void CallHandlerListRemoteDirectoryContent(ClientSocket *client);
-    void CallHandlerOnFileUpload(ClientSocket *client);
+    void CallHandlerOnFileUploadInit(ClientSocket *client, Packet &packet);
+    void CallHandlerUploadDataReived(ClientSocket *client, Packet &packet);
 };
 
 #endif // _SERVER_H_
